@@ -10,6 +10,7 @@ import se.kth.iv1350.pos.util.Amount;
  */
 public class View {
     private final Controller controller;
+    private Amount runningTotal = new Amount();
 
     /**
      * Creates a new instance.
@@ -22,46 +23,78 @@ public class View {
 
     /**
      * Simulates a user interaction with the system.
+     * This method performs a complete sale following the basic flow from requirements.
      */
     public void runFakeExecution() {
         // Start new sale
         System.out.println("Starting new sale...");
         controller.startNewSale();
+        runningTotal = new Amount();
 
-        // Scan items
-        System.out.println("Scanning items...");
-        scanItem("1", 2);   // 2 Apples
-        scanItem("3", 1);   // 1 Milk
-        scanItem("2", 3);   // 3 Oranges
-        scanItem("999", 1); // Invalid item ID
-        scanItem("3", 2);   // 2 more Milk (should add to existing)
+        // Add 1 item with item id abc123
+        System.out.println("Add 1 item with item id 1:");
+        scanItem("1", 1);   // Using ID 1 from our database (Apple)
+
+        // Add same item again
+        System.out.println("Add 1 item with item id 1:");
+        scanItem("1", 1);   // Same item, should be treated as duplicate
+
+        // Add a different item
+        System.out.println("Add 1 item with item id 3:");
+        scanItem("3", 1);   // Using ID 3 from our database (Milk)
+
+        System.out.println("Add 1 item with item id 2:");
+        scanItem("2", 1);
 
         // End sale
-        System.out.println("\nEnding sale...");
+        System.out.println("End sale :");
         Amount total = controller.endSale();
-        System.out.println("Total with VAT: " + total);
+        System.out.println("Total cost (incl VAT): " + total);
 
-        // Request discount
-        System.out.println("\nCustomer requests discount with ID 1001...");
-        Amount discountedTotal = controller.requestDiscount("1001");
-        System.out.println("Total after discount: " + discountedTotal);
+        // Payment
+        Amount paymentAmount = new Amount(100);
+        System.out.println("Customer pays " + paymentAmount + ":");
+        Amount change = controller.pay(paymentAmount);
 
-        // Pay
-        System.out.println("\nCustomer pays 200 SEK...");
-        controller.pay(new Amount(200));
-
-        System.out.println("\nSale completed.");
+        // Final message about change
+        System.out.println("\nChange to give the customer: " + change);
     }
 
     private void scanItem(String itemID, int quantity) {
-        System.out.println("Scanning item ID: " + itemID + ", quantity: " + quantity);
-        ItemDTO item = controller.enterItem(itemID, quantity);
-        if (item != null) {
-            System.out.println("Added: " + item.getDescription() +
-                             ", price: " + item.getPrice() +
-                             ", VAT rate: " + (item.getVatRate() * 100) + "%");
+        Controller.ItemWithRunningTotal result = controller.enterItem(itemID, quantity);
+
+        if (result != null) {
+            ItemDTO item = result.getItem();
+            runningTotal = result.getRunningTotal();
+            boolean isDuplicate = result.isDuplicate();
+
+            // Display item information in the required format
+            System.out.println("Item ID : " + item.getItemID());
+            System.out.println("Item name : " + item.getName());
+            System.out.println("Item cost : " + formatAmount(item.getPrice()) + " SEK");
+            System.out.println("VAT : " + (int)(item.getVatRate() * 100) + "%");
+            System.out.println("Item description : " + item.getDescription());
+            System.out.println();
+
+            if (isDuplicate) {
+                System.out.println("This item was already in the sale. Quantity has been updated.");
+            }
+
+            // Display running total
+            System.out.println("Total cost (incl VAT): " + formatAmount(runningTotal) + " SEK");
+            Amount totalVAT = controller.getCurrentSale().calculateTotalVat();
+            System.out.println("Total VAT : " + formatAmount(totalVAT) + " SEK");
+            System.out.println();
+
         } else {
-            System.out.println("Item not found!");
+            System.out.println("Item with ID " + itemID + " not found in inventory!");
+            System.out.println();
         }
     }
+
+    private String formatAmount(Amount amount) {
+        // Format with colon as decimal separator as per requirements example
+        return String.format("%.2f", amount.getValue().doubleValue()).replace('.', ':');
+    }
+
 }

@@ -84,7 +84,7 @@ public final class Amount {
 
     @Override
     public String toString() {
-        return value.toString();
+        return String.format("%.2f SEK", value.doubleValue());
     }
 
     @Override

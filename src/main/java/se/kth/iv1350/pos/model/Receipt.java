@@ -1,9 +1,7 @@
 package se.kth.iv1350.pos.model;
-
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import se.kth.iv1350.pos.util.Amount;
-
 /**
  * Represents a receipt, which proves that a payment has been made.
  */
@@ -12,6 +10,7 @@ public class Receipt {
     private final LocalDateTime saleTime;
     private final Amount paymentAmount;
     private final Amount changeAmount;
+    private final int AMOUNT_COLUMN = 40; // Increased to allow longer product names
 
     /**
      * Creates a new instance.
@@ -34,48 +33,66 @@ public class Receipt {
      */
     public String format() {
         StringBuilder receipt = new StringBuilder();
-
-        // Header
-        receipt.append("===== RECEIPT =====\n");
-        receipt.append(formatDateTime(saleTime)).append("\n\n");
+        // Receipt header
+        receipt.append("------------------ Begin receipt -------------------\n");
+        receipt.append("Time of Sale : ").append(formatDateTime(saleTime)).append("\n\n");
 
         // Items
-        receipt.append("ITEMS:\n");
         for (SaleLineItem lineItem : sale.getItems()) {
-            receipt.append(formatLineItem(lineItem)).append("\n");
+            String leftSide = String.format("%s %d x %s",
+                lineItem.getItem().getName(), // No truncation - show full name
+                lineItem.getQuantity(),
+                formatAmount(lineItem.getItem().getPrice()));
+            receipt.append(formatLineWithAmount(leftSide, lineItem.getSubtotal())).append("\n");
         }
         receipt.append("\n");
 
-        // Totals
-        receipt.append("Subtotal: ").append(sale.calculateTotal()).append("\n");
-        receipt.append("VAT: ").append(sale.calculateTotalVat()).append("\n");
+        // Totals with consistent alignment
+        receipt.append(formatLineWithAmount("Total :", sale.calculateTotalWithVat())).append("\n");
+        receipt.append(formatLineWithAmount("VAT :", sale.calculateTotalVat(), false)).append("\n\n");
 
-        if (sale.hasDiscount()) {
-            receipt.append("Discount: -").append(sale.getDiscountAmount()).append("\n");
-        }
+        // Payment details with consistent alignment
+        receipt.append(formatLineWithAmount("Cash :", paymentAmount)).append("\n");
+        receipt.append(formatLineWithAmount("Change :", changeAmount)).append("\n");
 
-        receipt.append("TOTAL: ").append(sale.calculateTotalWithVat()).append("\n\n");
-
-        // Payment
-        receipt.append("Paid amount: ").append(paymentAmount).append("\n");
-        receipt.append("Change: ").append(changeAmount).append("\n");
-
-        receipt.append("===================\n");
-        receipt.append("Thank you for shopping with us!");
-
+        // Receipt footer
+        receipt.append("------------------ End receipt ---------------------");
         return receipt.toString();
     }
 
+    /**
+     * Formats a line with right-aligned amount and "SEK" suffix
+     */
+    private String formatLineWithAmount(String leftText, Amount amount) {
+        return formatLineWithAmount(leftText, amount, true);
+    }
+
+    /**
+     * Formats a line with right-aligned amount and optional "SEK" suffix
+     */
+    private String formatLineWithAmount(String leftText, Amount amount, boolean includeSEK) {
+        StringBuilder line = new StringBuilder(leftText);
+        String amountStr = formatAmount(amount);
+
+        // Calculate spaces needed to position the amount exactly at AMOUNT_COLUMN
+        int spacesNeeded = AMOUNT_COLUMN - line.length() - amountStr.length();
+        if (spacesNeeded < 1) spacesNeeded = 1;
+
+        line.append(" ".repeat(spacesNeeded)).append(amountStr);
+
+        if (includeSEK) {
+            line.append(" SEK");
+        }
+
+        return line.toString();
+    }
+
     private String formatDateTime(LocalDateTime dateTime) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         return dateTime.format(formatter);
     }
 
-    private String formatLineItem(SaleLineItem lineItem) {
-        return String.format("%-20s %3d × %8s = %8s",
-                lineItem.getItem().getDescription(),
-                lineItem.getQuantity(),
-                lineItem.getItem().getPrice(),
-                lineItem.getSubtotal());
+    private String formatAmount(Amount amount) {
+        return String.format("%.2f", amount.getValue().doubleValue()).replace('.', ':');
     }
 }

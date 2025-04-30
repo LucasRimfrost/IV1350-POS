@@ -7,13 +7,17 @@ package se.kth.iv1350.pos.integration;
 public class RegistryCreator {
     private final ItemRegistry itemRegistry;
     private final DiscountRegistry discountRegistry;
+    private final AccountingSystem accountingSystem;
+    private final Printer printer;
 
     /**
-     * Creates a new instance and initializes all needed registry classes.
+     * Creates a new instance and initializes all needed registry classes and external system interfaces.
      */
     public RegistryCreator() {
         itemRegistry = new ItemRegistry();
         discountRegistry = new DiscountRegistry();
+        accountingSystem = new AccountingSystem();
+        printer = new Printer();
     }
 
     /**
@@ -32,5 +36,23 @@ public class RegistryCreator {
      */
     public DiscountRegistry getDiscountRegistry() {
         return discountRegistry;
+    }
+
+    /**
+     * Gets the accounting system interface.
+     *
+     * @return The accounting system interface.
+     */
+    public AccountingSystem getAccountingSystem() {
+        return accountingSystem;
+    }
+
+    /**
+     * Gets the printer interface.
+     *
+     * @return The printer interface.
+     */
+    public Printer getPrinter() {
+        return printer;
     }
 }

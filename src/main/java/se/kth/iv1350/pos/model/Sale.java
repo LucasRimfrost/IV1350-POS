@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import se.kth.iv1350.pos.dto.CustomerDTO;
 import se.kth.iv1350.pos.dto.ItemDTO;
+import se.kth.iv1350.pos.integration.ItemRegistry;
 import se.kth.iv1350.pos.integration.Printer;
 import se.kth.iv1350.pos.util.Amount;
 
@@ -30,23 +31,23 @@ public class Sale {
      *
      * @param itemDTO The item to add.
      * @param quantity The quantity of the specified item.
-     * @return A line item with the specified item.
+     * @return true if item was added successfully, false otherwise
      */
-    public SaleLineItem addItem(ItemDTO itemDTO, int quantity) {
+    public boolean addItem(ItemDTO itemDTO, int quantity) {
         if (itemDTO == null) {
-            return null;
+            return false;
         }
 
         for (SaleLineItem item : items) {
             if (item.getItem().getItemID().equals(itemDTO.getItemID())) {
                 item.incrementQuantity(quantity);
-                return item;
+                return true;
             }
         }
 
         SaleLineItem newLineItem = new SaleLineItem(itemDTO, quantity);
         items.add(newLineItem);
-        return newLineItem;
+        return true;
     }
 
     /**
@@ -102,11 +103,13 @@ public class Sale {
      * Handles payment for this sale.
      *
      * @param payment The payment used to pay for the sale.
+     * @return The change amount to be given back to the customer.
      */
-    public void pay(Payment payment) {
+    public Amount pay(Payment payment) {
         this.payment = payment;
         Amount change = ((CashPayment) payment).getChange(calculateTotalWithVat());
         this.receipt = new Receipt(this, payment.getAmount(), change);
+        return change;
     }
 
     /**
@@ -145,5 +148,15 @@ public class Sale {
      */
     public List<SaleLineItem> getItems() {
         return new ArrayList<>(items);
+    }
+    
+    /**
+     * Updates inventory with all items in this sale.
+     * 
+     * @param itemRegistry The registry to update inventory in
+     * @return true if all updates were successful, false if any failed
+     */
+    public boolean updateInventory(ItemRegistry itemRegistry) {
+        return itemRegistry.updateInventoryForCompletedSale(items);
     }
 }

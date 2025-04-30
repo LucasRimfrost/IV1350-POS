@@ -1,7 +1,6 @@
 package se.kth.iv1350.pos.startup;
 
 import se.kth.iv1350.pos.controller.Controller;
-import se.kth.iv1350.pos.integration.Printer;
 import se.kth.iv1350.pos.integration.RegistryCreator;
 import se.kth.iv1350.pos.view.View;
 
@@ -16,8 +15,7 @@ public class Main {
      */
     public static void main(String[] args) {
         RegistryCreator creator = new RegistryCreator();
-        Printer printer = new Printer();
-        Controller controller = new Controller(creator, printer);
+        Controller controller = new Controller(creator);
         View view = new View(controller);
 
         view.runFakeExecution();

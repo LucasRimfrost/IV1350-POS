@@ -8,6 +8,7 @@ import se.kth.iv1350.pos.util.Amount;
  */
 public final class ItemDTO {
     private final String itemID;
+    private final String name;
     private final String description;
     private final Amount price;
     private final double vatRate;
@@ -16,12 +17,14 @@ public final class ItemDTO {
      * Creates a new instance representing an item.
      *
      * @param itemID The item identifier.
+     * @param name The item name.
      * @param description The item description.
      * @param price The item price, without VAT.
      * @param vatRate The VAT rate for the item (e.g., 0.25 for 25%).
      */
-    public ItemDTO(String itemID, String description, Amount price, double vatRate) {
+    public ItemDTO(String itemID, String name, String description, Amount price, double vatRate) {
         this.itemID = itemID;
+        this.name = name;
         this.description = description;
         this.price = price;
         this.vatRate = vatRate;
@@ -34,6 +37,15 @@ public final class ItemDTO {
      */
     public String getItemID() {
         return itemID;
+    }
+
+    /**
+     * Gets the item name.
+     *
+     * @return The item name.
+     */
+    public String getName() {
+        return name;
     }
 
     /**

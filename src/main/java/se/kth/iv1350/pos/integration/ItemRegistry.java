@@ -1,22 +1,26 @@
 package se.kth.iv1350.pos.integration;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import se.kth.iv1350.pos.dto.ItemDTO;
+import se.kth.iv1350.pos.model.SaleLineItem;
 import se.kth.iv1350.pos.util.Amount;
 
 /**
  * Contains all calls to the external inventory system.
- * This class is responsible for retrieving item information.
+ * This class is responsible for retrieving item information and updating inventory.
  */
 public class ItemRegistry {
     private Map<String, ItemDTO> items = new HashMap<>();
+    private Map<String, Integer> inventory = new HashMap<>();
 
     /**
      * Creates a new instance and initializes with some default test items.
      */
     public ItemRegistry() {
         addTestItems();
+        initializeInventory();
     }
 
     /**
@@ -30,23 +34,102 @@ public class ItemRegistry {
     }
 
     /**
+     * Checks if the specified item is available in inventory.
+     *
+     * @param itemID The item identifier.
+     * @param quantity The quantity to check.
+     * @return true if the requested quantity is available, false otherwise.
+     */
+    public boolean checkItemAvailability(String itemID, int quantity) {
+        Integer availableQuantity = inventory.get(itemID);
+        return availableQuantity != null && availableQuantity >= quantity;
+    }
+
+    /**
      * Updates the inventory with the specified item quantity.
      * This method would connect to the external inventory system in a production environment.
      *
      * @param itemID The item identifier.
      * @param quantity The quantity to decrease from inventory.
+     * @return true if update was successful, false otherwise.
      */
-    public void updateInventory(String itemID, int quantity) {
+    public boolean updateInventory(String itemID, int quantity) {
         // This would call the external inventory system in a real implementation
-        System.out.println("Inventory updated for item: " + itemID +
-                         ", quantity: -" + quantity);
+        Integer currentQuantity = inventory.get(itemID);
+
+        if (currentQuantity == null || currentQuantity < quantity) {
+            System.out.println("Inventory update failed: Insufficient quantity for item: " + itemID);
+            return false;
+        }
+
+        inventory.put(itemID, currentQuantity - quantity);
+        System.out.println("Told external inventory system to decrease inventory quantity");
+        System.out.println("of item " + itemID + " by " + quantity + " units.");
+        return true;
+    }
+
+    /**
+     * Updates inventory for multiple items from a completed sale.
+     * This method would connect to the external inventory system in a production environment.
+     *
+     * @param saleItems List of sale line items to update in inventory.
+     * @return true if all updates were successful, false if any failed.
+     */
+    public boolean updateInventoryForCompletedSale(List<SaleLineItem> saleItems) {
+        boolean allSuccessful = true;
+
+        System.out.println("Updating inventory for completed sale...");
+        for (SaleLineItem item : saleItems) {
+            String itemID = item.getItem().getItemID();
+            int quantity = item.getQuantity();
+
+            boolean success = updateInventory(itemID, quantity);
+            if (!success) {
+                allSuccessful = false;
+                System.out.println("Warning: Failed to update inventory for item: " + itemID);
+            }
+        }
+
+        if (allSuccessful) {
+            System.out.println("Inventory successfully updated for all items");
+        } else {
+            System.out.println("Some inventory updates failed. Manual verification required.");
+        }
+
+        return allSuccessful;
     }
 
     private void addTestItems() {
-        items.put("1", new ItemDTO("1", "Apple", new Amount(10.0), 0.12));
-        items.put("2", new ItemDTO("2", "Orange", new Amount(15.0), 0.12));
-        items.put("3", new ItemDTO("3", "Milk", new Amount(22.0), 0.12));
-        items.put("4", new ItemDTO("4", "Bread", new Amount(30.0), 0.25));
-        items.put("5", new ItemDTO("5", "Cheese", new Amount(75.0), 0.25));
+        items.put("1", new ItemDTO("1",
+                    "Kellogg's Cornflakes",
+                    "500g, whole grain, fortified with vitamins",
+                    new Amount(10.0), 0.12));
+
+        items.put("2", new ItemDTO("2",
+                    "Barilla Pasta",
+                    "500g, spaghetti, bronze cut",
+                    new Amount(15.0), 0.12));
+
+        items.put("3", new ItemDTO("3",
+                    "Arla Milk",
+                    "1L, organic whole milk, pasteurized",
+                    new Amount(22.0), 0.12));
+
+        items.put("4", new ItemDTO("4",
+                    "Wasa Crispbread",
+                    "275g, whole grain, low sugar",
+                    new Amount(30.0), 0.25));
+
+        items.put("5", new ItemDTO("5",
+                    "Fazer Chocolate",
+                    "200g, milk chocolate, Finnish quality",
+                    new Amount(75.0), 0.25));
+    }
+
+    private void initializeInventory() {
+        // Initialize test inventory with 50 of each item
+        for (String itemID : items.keySet()) {
+            inventory.put(itemID, 50);
+        }
     }
 }
