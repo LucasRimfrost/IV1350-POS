@@ -88,16 +88,18 @@ public class Controller {
      * @param itemID The identifier of the item that is being entered.
      * @param quantity The quantity of the specified item.
      * @return Information about the entered item, including price and description.
-     *         Returns null if the item does not exist.
-     * @throws IllegalStateException if no sale has been started
+     *         Returns null if the item does not exist or no sale has been started.
      */
     public ItemWithRunningTotal enterItem(String itemID, int quantity) {
-        validateSaleExists();
+        // Check if sale has been started
+        if (currentSale == null) {
+            return null; // No sale started
+        }
 
         // Find the item in inventory
         ItemDTO item = itemRegistry.findItem(itemID);
         if (item == null) {
-            return null;
+            return null; // Item not found
         }
 
         // Check if this item is already in the sale
@@ -117,23 +119,16 @@ public class Controller {
      * @return true if the item is already in the sale, false otherwise
      */
     private boolean isItemAlreadyInSale(String itemID) {
+        if (currentSale == null) {
+            return false;
+        }
+
         for (SaleLineItem lineItem : currentSale.getItems()) {
             if (lineItem.getItem().getItemID().equals(itemID)) {
                 return true;
             }
         }
         return false;
-    }
-
-    /**
-     * Validates that a sale has been started.
-     *
-     * @throws IllegalStateException if no sale has been started
-     */
-    private void validateSaleExists() {
-        if (currentSale == null) {
-            throw new IllegalStateException("No sale has been started.");
-        }
     }
 
     /**
@@ -189,11 +184,12 @@ public class Controller {
      * Ends the sale. No more items can be entered after this method is called.
      * Calculates the final total including VAT.
      *
-     * @return The total price of the sale, including VAT.
-     * @throws IllegalStateException if no sale has been started
+     * @return The total price of the sale, including VAT, or null if no sale is in progress.
      */
     public Amount endSale() {
-        validateSaleExists();
+        if (currentSale == null) {
+            return null; // No sale in progress
+        }
         return currentSale.calculateTotalWithVat();
     }
 
@@ -202,11 +198,12 @@ public class Controller {
      * and notifies external systems about the completed sale.
      *
      * @param paidAmount The paid amount.
-     * @return The change amount to be given back to the customer.
-     * @throws IllegalStateException if no sale has been started
+     * @return The change amount to be given back to the customer, or null if no sale is in progress.
      */
     public Amount processPayment(Amount paidAmount) {
-        validateSaleExists();
+        if (currentSale == null) {
+            return null; // No sale in progress
+        }
 
         // Process the payment and calculate change
         CashPayment payment = new CashPayment(paidAmount);
@@ -224,6 +221,10 @@ public class Controller {
      * @param payment The payment that was made
      */
     private void completeTransaction(CashPayment payment) {
+        if (currentSale == null || payment == null) {
+            return; // Safety check
+        }
+
         // Update cash register
         cashRegister.addPayment(payment);
 
@@ -244,6 +245,10 @@ public class Controller {
      * Updates accounting records with the sale information.
      */
     private void updateAccountingRecords() {
+        if (currentSale == null || accountingSystem == null) {
+            return; // Safety check
+        }
+
         accountingSystem.recordSale(currentSale);
         accountingSystem.updateSalesStatistics(currentSale.calculateTotalWithVat());
     }
@@ -252,8 +257,14 @@ public class Controller {
      * Notifies all registered external systems about the completed sale.
      */
     private void notifyExternalSystems() {
+        if (currentSale == null || externalSystemObservers == null) {
+            return; // Safety check
+        }
+
         for (ExternalSystemObserver observer : externalSystemObservers) {
-            observer.saleCompleted(currentSale);
+            if (observer != null) {
+                observer.saleCompleted(currentSale);
+            }
         }
     }
 
@@ -262,11 +273,12 @@ public class Controller {
      * Applies any eligible discounts to the current sale.
      *
      * @param customerID The ID of the customer requesting the discount.
-     * @return The total price after the discount.
-     * @throws IllegalStateException if no sale has been started
+     * @return The total price after the discount, or null if no sale is in progress.
      */
     public Amount requestDiscount(String customerID) {
-        validateSaleExists();
+        if (currentSale == null) {
+            return null; // No sale in progress
+        }
 
         // Create customer DTO and calculate applicable discount
         CustomerDTO customer = new CustomerDTO(customerID);
@@ -283,6 +295,10 @@ public class Controller {
      * @return The calculated discount amount
      */
     private Amount calculateDiscountForCustomer(String customerID) {
+        if (currentSale == null || discountRegistry == null || customerID == null) {
+            return new Amount(0); // Safety check, return zero discount
+        }
+
         return discountRegistry.getDiscount(
             currentSale.getItems(),
             currentSale.calculateTotalWithVat(),
@@ -302,11 +318,12 @@ public class Controller {
     /**
      * Gets the current total VAT amount.
      *
-     * @return The current total VAT amount
-     * @throws IllegalStateException if no sale has been started
+     * @return The current total VAT amount, or null if no sale is in progress.
      */
     public Amount getCurrentTotalVAT() {
-        validateSaleExists();
+        if (currentSale == null) {
+            return null; // No sale in progress
+        }
         return currentSale.calculateTotalVat();
     }
 }
