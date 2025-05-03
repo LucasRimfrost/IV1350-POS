@@ -22,13 +22,17 @@ import se.kth.iv1350.pos.util.Amount;
  * and notifying external systems.
  */
 public class Controller {
+    // External systems and registries
     private final ItemRegistry itemRegistry;
     private final DiscountRegistry discountRegistry;
     private final Printer printer;
-    private final CashRegister cashRegister;
-    private final List<ExternalSystemObserver> externalSystemObservers;
     private final AccountingSystem accountingSystem;
 
+    // Internal components
+    private final CashRegister cashRegister;
+    private final List<ExternalSystemObserver> externalSystemObservers;
+
+    // Current transaction
     private Sale currentSale;
 
     /**
@@ -49,10 +53,13 @@ public class Controller {
      * @param creator Used to get all classes that handle database calls.
      */
     public Controller(RegistryCreator creator) {
+        // Initialize external system connections
         this.itemRegistry = creator.getItemRegistry();
         this.discountRegistry = creator.getDiscountRegistry();
         this.printer = creator.getPrinter();
         this.accountingSystem = creator.getAccountingSystem();
+
+        // Initialize internal components
         this.cashRegister = new CashRegister();
         this.externalSystemObservers = new ArrayList<>();
     }
@@ -85,25 +92,48 @@ public class Controller {
      * @throws IllegalStateException if no sale has been started
      */
     public ItemWithRunningTotal enterItem(String itemID, int quantity) {
-        if (currentSale == null) {
-            throw new IllegalStateException("No sale has been started.");
-        }
+        validateSaleExists();
 
+        // Find the item in inventory
         ItemDTO item = itemRegistry.findItem(itemID);
         if (item == null) {
             return null;
         }
 
-        boolean isDuplicate = false;
+        // Check if this item is already in the sale
+        boolean isDuplicate = isItemAlreadyInSale(itemID);
+
+        // Add the item to the sale
+        currentSale.addItem(item, quantity);
+
+        // Return information about the entered item and updated totals
+        return new ItemWithRunningTotal(item, currentSale.calculateTotalWithVat(), isDuplicate);
+    }
+
+    /**
+     * Checks if an item with the specified ID is already in the current sale.
+     *
+     * @param itemID The item identifier to check
+     * @return true if the item is already in the sale, false otherwise
+     */
+    private boolean isItemAlreadyInSale(String itemID) {
         for (SaleLineItem lineItem : currentSale.getItems()) {
             if (lineItem.getItem().getItemID().equals(itemID)) {
-                isDuplicate = true;
-                break;
+                return true;
             }
         }
+        return false;
+    }
 
-        currentSale.addItem(item, quantity);
-        return new ItemWithRunningTotal(item, currentSale.calculateTotalWithVat(), isDuplicate);
+    /**
+     * Validates that a sale has been started.
+     *
+     * @throws IllegalStateException if no sale has been started
+     */
+    private void validateSaleExists() {
+        if (currentSale == null) {
+            throw new IllegalStateException("No sale has been started.");
+        }
     }
 
     /**
@@ -163,9 +193,7 @@ public class Controller {
      * @throws IllegalStateException if no sale has been started
      */
     public Amount endSale() {
-        if (currentSale == null) {
-            throw new IllegalStateException("No sale has been started.");
-        }
+        validateSaleExists();
         return currentSale.calculateTotalWithVat();
     }
 
@@ -177,18 +205,30 @@ public class Controller {
      * @return The change amount to be given back to the customer.
      * @throws IllegalStateException if no sale has been started
      */
-    public Amount pay(Amount paidAmount) {
-        if (currentSale == null) {
-            throw new IllegalStateException("No sale has been started.");
-        }
+    public Amount processPayment(Amount paidAmount) {
+        validateSaleExists();
 
+        // Process the payment and calculate change
         CashPayment payment = new CashPayment(paidAmount);
         Amount change = currentSale.pay(payment);
+
+        // Complete all transaction-related operations
+        completeTransaction(payment);
+
+        return change;
+    }
+
+    /**
+     * Completes all operations related to finalizing a transaction after payment.
+     *
+     * @param payment The payment that was made
+     */
+    private void completeTransaction(CashPayment payment) {
+        // Update cash register
         cashRegister.addPayment(payment);
 
-        // Notify accounting system
-        accountingSystem.recordSale(currentSale);
-        accountingSystem.updateSalesStatistics(currentSale.calculateTotalWithVat());
+        // Update accounting records
+        updateAccountingRecords();
 
         // Update inventory
         currentSale.updateInventory(itemRegistry);
@@ -198,8 +238,14 @@ public class Controller {
 
         // Notify external systems
         notifyExternalSystems();
+    }
 
-        return change;
+    /**
+     * Updates accounting records with the sale information.
+     */
+    private void updateAccountingRecords() {
+        accountingSystem.recordSale(currentSale);
+        accountingSystem.updateSalesStatistics(currentSale.calculateTotalWithVat());
     }
 
     /**
@@ -220,17 +266,28 @@ public class Controller {
      * @throws IllegalStateException if no sale has been started
      */
     public Amount requestDiscount(String customerID) {
-        if (currentSale == null) {
-            throw new IllegalStateException("No sale has been started.");
-        }
-        
+        validateSaleExists();
+
+        // Create customer DTO and calculate applicable discount
         CustomerDTO customer = new CustomerDTO(customerID);
-        Amount discount = discountRegistry.getDiscount(
+        Amount discount = calculateDiscountForCustomer(customerID);
+
+        // Apply the discount to the sale
+        return currentSale.applyDiscount(customer, discount);
+    }
+
+    /**
+     * Calculates the applicable discount for a customer.
+     *
+     * @param customerID The customer's ID
+     * @return The calculated discount amount
+     */
+    private Amount calculateDiscountForCustomer(String customerID) {
+        return discountRegistry.getDiscount(
             currentSale.getItems(),
             currentSale.calculateTotalWithVat(),
             customerID
         );
-        return currentSale.applyDiscount(customer, discount);
     }
 
     /**
@@ -240,5 +297,16 @@ public class Controller {
      */
     public Sale getCurrentSale() {
         return currentSale;
+    }
+
+    /**
+     * Gets the current total VAT amount.
+     *
+     * @return The current total VAT amount
+     * @throws IllegalStateException if no sale has been started
+     */
+    public Amount getCurrentTotalVAT() {
+        validateSaleExists();
+        return currentSale.calculateTotalVat();
     }
 }

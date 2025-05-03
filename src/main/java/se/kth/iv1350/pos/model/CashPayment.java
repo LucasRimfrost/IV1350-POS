@@ -6,7 +6,7 @@ import se.kth.iv1350.pos.util.Amount;
  * Represents a cash payment in a sale.
  * This class implements the Payment interface.
  */
-public class CashPayment implements Payment {
+public class CashPayment {
     private final Amount paidAmount;
 
     /**
@@ -23,7 +23,6 @@ public class CashPayment implements Payment {
      *
      * @return The paid amount.
      */
-    @Override
     public Amount getAmount() {
         return paidAmount;
     }

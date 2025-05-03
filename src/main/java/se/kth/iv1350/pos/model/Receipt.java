@@ -33,31 +33,48 @@ public class Receipt {
      */
     public String format() {
         StringBuilder receipt = new StringBuilder();
+
+        appendReceiptHeader(receipt);
+        appendItemDetails(receipt);
+        appendTotals(receipt);
+        appendPaymentDetails(receipt);
+        appendReceiptFooter(receipt);
+
+        return receipt.toString();
+    }
+
+    private void appendReceiptHeader(StringBuilder receipt) {
         // Receipt header
         receipt.append("------------------ Begin receipt -------------------\n");
         receipt.append("Time of Sale : ").append(formatDateTime(saleTime)).append("\n\n");
+    }
 
+    private void appendItemDetails(StringBuilder receipt) {
         // Items
         for (SaleLineItem lineItem : sale.getItems()) {
             String leftSide = String.format("%s %d x %s",
-                lineItem.getItem().getName(), // No truncation - show full name
-                lineItem.getQuantity(),
-                formatAmount(lineItem.getItem().getPrice()));
+                    lineItem.getItem().getName(), // No truncation - show full name
+                    lineItem.getQuantity(),
+                    formatAmount(lineItem.getItem().getPrice()));
             receipt.append(formatLineWithAmount(leftSide, lineItem.getSubtotal())).append("\n");
         }
         receipt.append("\n");
+    }
 
-        // Totals with consistent alignment
+    private void appendTotals(StringBuilder receipt) {
         receipt.append(formatLineWithAmount("Total :", sale.calculateTotalWithVat())).append("\n");
         receipt.append(formatLineWithAmount("VAT :", sale.calculateTotalVat(), false)).append("\n\n");
+    }
 
+    private void appendPaymentDetails(StringBuilder receipt) {
         // Payment details with consistent alignment
         receipt.append(formatLineWithAmount("Cash :", paymentAmount)).append("\n");
         receipt.append(formatLineWithAmount("Change :", changeAmount)).append("\n");
+    }
 
+    private void appendReceiptFooter(StringBuilder receipt) {
         // Receipt footer
         receipt.append("------------------ End receipt ---------------------");
-        return receipt.toString();
     }
 
     /**

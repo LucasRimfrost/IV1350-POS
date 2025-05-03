@@ -14,52 +14,58 @@ import se.kth.iv1350.pos.util.Amount;
  * This class is responsible for retrieving and calculating discount information.
  */
 public class DiscountRegistry {
-    private Map<String, Double> customerDiscounts = new HashMap<>();
-    private Map<String, Double> itemDiscounts = new HashMap<>();
-    private Map<String, Set<String>> itemCombinationDiscounts = new HashMap<>();
-    private Map<String, Double> combinationDiscountRates = new HashMap<>();
+    // Discount database tables
+    private final Map<String, Double> customerDiscounts = new HashMap<>();
+    private final Map<String, Double> itemDiscounts = new HashMap<>();
+    private final Map<String, Set<String>> itemCombinationDiscounts = new HashMap<>();
+    private final Map<String, Double> combinationDiscountRates = new HashMap<>();
+
+    // Constants for volume discounts
+    private static final double LARGE_PURCHASE_THRESHOLD = 1000.0;
+    private static final double MEDIUM_PURCHASE_THRESHOLD = 500.0;
+    private static final double LARGE_PURCHASE_DISCOUNT_RATE = 0.03; // 3%
+    private static final double MEDIUM_PURCHASE_DISCOUNT_RATE = 0.02; // 2%
 
     /**
      * Creates a new instance and initializes with some default discounts.
      */
     public DiscountRegistry() {
-        addTestDiscounts();
+        initializeTestDiscounts();
     }
 
     /**
-     * Calculates the discount based on sale items, total amount, and customer ID.
-     * Implementation matches the requirements from the specification.
+     * Calculates the total discount based on sale items, total amount, and customer ID.
+     * Applies all eligible discount types according to business rules.
      *
      * @param items The items in the sale.
      * @param totalAmount The total amount of the sale.
      * @param customerID The customer identifier.
-     * @return The discount amount.
+     * @return The total discount amount to be applied.
      */
     public Amount getDiscount(List<SaleLineItem> items, Amount totalAmount, String customerID) {
+        // Initialize with zero discount
         Amount totalDiscount = new Amount(0);
-        
-        // Apply customer-specific discount
+
+        // Calculate all discount types
         Amount customerDiscount = calculateCustomerDiscount(totalAmount, customerID);
-        totalDiscount = totalDiscount.add(customerDiscount);
-        
-        // Apply volume-based discount
         Amount volumeDiscount = calculateVolumeDiscount(totalAmount);
-        totalDiscount = totalDiscount.add(volumeDiscount);
-        
-        // Apply item-specific discounts
         Amount itemDiscount = calculateItemSpecificDiscounts(items);
-        totalDiscount = totalDiscount.add(itemDiscount);
-        
-        // Apply item combination discounts
         Amount combinationDiscount = calculateItemCombinationDiscounts(items);
-        totalDiscount = totalDiscount.add(combinationDiscount);
-        
+
+        // Combine all discounts
+        totalDiscount = totalDiscount
+                         .add(customerDiscount)
+                         .add(volumeDiscount)
+                         .add(itemDiscount)
+                         .add(combinationDiscount);
+
         // Log discount details for accounting purposes
-        logDiscountDetails(customerDiscount, volumeDiscount, itemDiscount, combinationDiscount, totalDiscount);
-        
+        logDiscountSummary(customerDiscount, volumeDiscount,
+                          itemDiscount, combinationDiscount, totalDiscount);
+
         return totalDiscount;
     }
-    
+
     /**
      * Verifies if a customer exists in the discount registry.
      *
@@ -69,7 +75,7 @@ public class DiscountRegistry {
     public boolean customerExists(String customerID) {
         return customerDiscounts.containsKey(customerID);
     }
-    
+
     /**
      * Gets the discount rate for a specific customer.
      *
@@ -80,7 +86,7 @@ public class DiscountRegistry {
         Double discountRate = customerDiscounts.get(customerID);
         return discountRate != null ? discountRate : 0;
     }
-    
+
     /**
      * Gets the discount rate for a specific item.
      *
@@ -92,87 +98,181 @@ public class DiscountRegistry {
         return discountRate != null ? discountRate : 0;
     }
 
+    /**
+     * Calculates customer-specific discount based on customer ID.
+     *
+     * @param totalAmount The total sale amount
+     * @param customerID The customer's ID
+     * @return The customer-specific discount amount
+     */
     private Amount calculateCustomerDiscount(Amount totalAmount, String customerID) {
         Double customerDiscountPercent = customerDiscounts.get(customerID);
-        
+
         if (customerDiscountPercent != null) {
-            return totalAmount.multiply(customerDiscountPercent);
+            Amount discount = totalAmount.multiply(customerDiscountPercent);
+            return discount;
         }
-        
+
         return new Amount(0);
     }
-    
+
+    /**
+     * Calculates volume-based discount based on total purchase amount.
+     * Applies tiered discounts based on purchase thresholds.
+     *
+     * @param totalAmount The total sale amount
+     * @return The volume-based discount amount
+     */
     private Amount calculateVolumeDiscount(Amount totalAmount) {
-        if (totalAmount.getValue().doubleValue() > 1000) {
-            return totalAmount.multiply(0.03); // 3% for purchases over 1000
-        } else if (totalAmount.getValue().doubleValue() > 500) {
-            return totalAmount.multiply(0.02); // 2% for purchases over 500
+        double purchaseAmount = totalAmount.getValue().doubleValue();
+
+        if (purchaseAmount > LARGE_PURCHASE_THRESHOLD) {
+            // 3% discount for purchases over 1000
+            return totalAmount.multiply(LARGE_PURCHASE_DISCOUNT_RATE);
+        } else if (purchaseAmount > MEDIUM_PURCHASE_THRESHOLD) {
+            // 2% discount for purchases over 500
+            return totalAmount.multiply(MEDIUM_PURCHASE_DISCOUNT_RATE);
         }
-        
+
+        // No volume discount applies
         return new Amount(0);
     }
-    
+
+    /**
+     * Calculates discounts for individual items that have specific discount rates.
+     *
+     * @param items The items in the sale
+     * @return The total item-specific discount amount
+     */
     private Amount calculateItemSpecificDiscounts(List<SaleLineItem> items) {
-        Amount discount = new Amount(0);
-        
+        Amount totalItemDiscount = new Amount(0);
+
         for (SaleLineItem item : items) {
             ItemDTO itemDTO = item.getItem();
             String itemID = itemDTO.getItemID();
             Double discountRate = itemDiscounts.get(itemID);
-            
+
             if (discountRate != null) {
+                // Calculate discount for this specific item
                 Amount itemPrice = itemDTO.getPrice().multiply(item.getQuantity());
                 Amount itemDiscount = itemPrice.multiply(discountRate);
-                discount = discount.add(itemDiscount);
-                
-                System.out.println("Applied item discount for " + itemDTO.getDescription() + 
-                                 " (" + discountRate * 100 + "%): " + itemDiscount);
+                totalItemDiscount = totalItemDiscount.add(itemDiscount);
+
+                logItemDiscount(itemDTO, discountRate, itemDiscount);
             }
         }
-        
-        return discount;
+
+        return totalItemDiscount;
     }
-    
+
+    /**
+     * Calculates discounts for combinations of items purchased together.
+     * Applies when all items in a defined combination are present in the sale.
+     *
+     * @param items The items in the sale
+     * @return The total combination discount amount
+     */
     private Amount calculateItemCombinationDiscounts(List<SaleLineItem> items) {
-        Amount discount = new Amount(0);
-        Set<String> saleItemIDs = new HashSet<>();
-        
-        // Extract all item IDs in the sale
-        for (SaleLineItem item : items) {
-            saleItemIDs.add(item.getItem().getItemID());
-        }
-        
-        // Check for matching combinations
+        Amount totalCombinationDiscount = new Amount(0);
+
+        // Collect all item IDs in this sale
+        Set<String> saleItemIDs = extractItemIDsFromSale(items);
+
+        // Check each defined combination against the sale items
         for (Map.Entry<String, Set<String>> entry : itemCombinationDiscounts.entrySet()) {
             String combinationID = entry.getKey();
             Set<String> requiredItems = entry.getValue();
-            
-            // Check if all required items are in the sale
+
+            // If all required items for this combination are present in the sale
             if (saleItemIDs.containsAll(requiredItems)) {
-                Double discountRate = combinationDiscountRates.get(combinationID);
-                if (discountRate != null) {
-                    // Calculate total price of the combination items
-                    Amount combinationPrice = new Amount(0);
-                    for (SaleLineItem item : items) {
-                        if (requiredItems.contains(item.getItem().getItemID())) {
-                            Amount itemPrice = item.getItem().getPrice().multiply(item.getQuantity());
-                            combinationPrice = combinationPrice.add(itemPrice);
-                        }
-                    }
-                    
-                    Amount combinationDiscount = combinationPrice.multiply(discountRate);
-                    discount = discount.add(combinationDiscount);
-                    
-                    System.out.println("Applied combination discount for combination " + combinationID + 
-                                     " (" + discountRate * 100 + "%): " + combinationDiscount);
-                }
+                Amount combinationDiscount = calculateDiscountForCombination(
+                    combinationID, requiredItems, items);
+                totalCombinationDiscount = totalCombinationDiscount.add(combinationDiscount);
             }
         }
-        
-        return discount;
+
+        return totalCombinationDiscount;
     }
-    
-    private void logDiscountDetails(Amount customerDiscount, Amount volumeDiscount, 
+
+    /**
+     * Extracts all item IDs from a sale.
+     *
+     * @param items The items in the sale
+     * @return A set of all item IDs in the sale
+     */
+    private Set<String> extractItemIDsFromSale(List<SaleLineItem> items) {
+        Set<String> saleItemIDs = new HashSet<>();
+        for (SaleLineItem item : items) {
+            saleItemIDs.add(item.getItem().getItemID());
+        }
+        return saleItemIDs;
+    }
+
+    /**
+     * Calculates the discount for a specific combination of items.
+     *
+     * @param combinationID The identifier for the combination
+     * @param requiredItems The set of items required for this combination
+     * @param saleItems All items in the sale
+     * @return The discount amount for this combination
+     */
+    private Amount calculateDiscountForCombination(
+            String combinationID, Set<String> requiredItems, List<SaleLineItem> saleItems) {
+
+        Double discountRate = combinationDiscountRates.get(combinationID);
+        if (discountRate == null) {
+            return new Amount(0);
+        }
+
+        // Calculate total price of the items in this combination
+        Amount combinationPrice = sumPriceOfItemsInCombination(requiredItems, saleItems);
+        Amount combinationDiscount = combinationPrice.multiply(discountRate);
+
+        logCombinationDiscount(combinationID, discountRate, combinationDiscount);
+
+        return combinationDiscount;
+    }
+
+    /**
+     * Calculates the total price of items in a combination.
+     *
+     * @param requiredItems The items in the combination
+     * @param saleItems All items in the sale
+     * @return The total price of the items in the combination
+     */
+    private Amount sumPriceOfItemsInCombination(Set<String> requiredItems, List<SaleLineItem> saleItems) {
+        Amount combinationPrice = new Amount(0);
+
+        for (SaleLineItem item : saleItems) {
+            if (requiredItems.contains(item.getItem().getItemID())) {
+                Amount itemPrice = item.getItem().getPrice().multiply(item.getQuantity());
+                combinationPrice = combinationPrice.add(itemPrice);
+            }
+        }
+
+        return combinationPrice;
+    }
+
+    /**
+     * Logs details about an item-specific discount.
+     */
+    private void logItemDiscount(ItemDTO item, double discountRate, Amount discountAmount) {
+        System.out.println("Applied item discount for " + item.getDescription() +
+                         " (" + discountRate * 100 + "%): " + discountAmount);
+    }
+
+    /**
+     * Logs details about a combination discount.
+     */
+    private void logCombinationDiscount(String combinationID, double discountRate, Amount discountAmount) {
+        System.out.println("Applied combination discount for combination " + combinationID +
+                         " (" + discountRate * 100 + "%): " + discountAmount);
+    }
+
+    /**
+     * Logs a summary of all applied discounts.
+     */
+    private void logDiscountSummary(Amount customerDiscount, Amount volumeDiscount,
                                   Amount itemDiscount, Amount combinationDiscount, Amount totalDiscount) {
         System.out.println("Discount details:");
         System.out.println("  Customer discount: " + customerDiscount);
@@ -182,29 +282,56 @@ public class DiscountRegistry {
         System.out.println("  Total discount: " + totalDiscount);
     }
 
-    private void addTestDiscounts() {
-        // Customer discounts
+    /**
+     * Initializes test discount data for development and testing.
+     */
+    private void initializeTestDiscounts() {
+        initializeCustomerDiscounts();
+        initializeItemDiscounts();
+        initializeItemCombinations();
+    }
+
+    /**
+     * Sets up customer-specific discount rates.
+     */
+    private void initializeCustomerDiscounts() {
+        // Loyal customers receive percentage discounts on their total purchase
         customerDiscounts.put("1001", 0.10); // 10% discount for customer 1001
         customerDiscounts.put("1002", 0.15); // 15% discount for customer 1002
-        
-        // Item-specific discounts
-        itemDiscounts.put("1", 0.05);  // 5% discount on Apples
-        itemDiscounts.put("5", 0.10);  // 10% discount on Cheese
-        
-        // Item combination discounts
-        // Combination 1: Bread and Cheese
-        Set<String> combination1 = new HashSet<>();
-        combination1.add("4"); // Bread
-        combination1.add("5"); // Cheese
-        itemCombinationDiscounts.put("COMBO1", combination1);
-        combinationDiscountRates.put("COMBO1", 0.15); // 15% discount on bread and cheese together
-        
-        // Combination 2: Apple, Orange, and Milk
-        Set<String> combination2 = new HashSet<>();
-        combination2.add("1"); // Apple
-        combination2.add("2"); // Orange
-        combination2.add("3"); // Milk
-        itemCombinationDiscounts.put("COMBO2", combination2);
-        combinationDiscountRates.put("COMBO2", 0.20); // 20% discount on fruit and milk together
+    }
+
+    /**
+     * Sets up item-specific discount rates.
+     */
+    private void initializeItemDiscounts() {
+        // Special promotions on individual items
+        itemDiscounts.put("1", 0.05);  // 5% discount on Cornflakes (item #1)
+        itemDiscounts.put("5", 0.10);  // 10% discount on Chocolate (item #5)
+    }
+
+    /**
+     * Sets up combination discounts for groups of items purchased together.
+     */
+    private void initializeItemCombinations() {
+        // Combination 1: Crispbread and Chocolate (snack combo)
+        Set<String> snackCombo = new HashSet<>();
+        snackCombo.add("4"); // Wasa Crispbread
+        snackCombo.add("5"); // Fazer Chocolate
+        itemCombinationDiscounts.put("COMBO1", snackCombo);
+        combinationDiscountRates.put("COMBO1", 0.15); // 15% discount on snack combo
+
+        // Combination 2: Breakfast combo (cereal and milk)
+        Set<String> breakfastCombo = new HashSet<>();
+        breakfastCombo.add("1"); // Kellogg's Cornflakes
+        breakfastCombo.add("3"); // Arla Milk
+        itemCombinationDiscounts.put("COMBO2", breakfastCombo);
+        combinationDiscountRates.put("COMBO2", 0.20); // 20% discount on breakfast combo
+
+        // Combination 3: Pasta meal combo
+        Set<String> pastaCombo = new HashSet<>();
+        pastaCombo.add("2"); // Barilla Pasta
+        pastaCombo.add("5"); // Fazer Chocolate (dessert)
+        itemCombinationDiscounts.put("COMBO3", pastaCombo);
+        combinationDiscountRates.put("COMBO3", 0.10); // 10% discount on pasta meal
     }
 }

@@ -10,12 +10,11 @@ import se.kth.iv1350.pos.util.Amount;
 
 /**
  * Represents a single sale transaction.
+ * Handles items, pricing, discounts, payments, and receipt generation.
  */
 public class Sale {
     private final List<SaleLineItem> items;
-    private CustomerDTO customer;
     private Amount discountAmount;
-    private Payment payment;
     private Receipt receipt;
 
     /**
@@ -27,27 +26,57 @@ public class Sale {
     }
 
     /**
-     * Adds an item to the sale.
+     * Adds an item to the sale or increases quantity if already present.
      *
      * @param itemDTO The item to add.
      * @param quantity The quantity of the specified item.
-     * @return true if item was added successfully, false otherwise
      */
-    public boolean addItem(ItemDTO itemDTO, int quantity) {
-        if (itemDTO == null) {
-            return false;
-        }
+    public void addItem(ItemDTO itemDTO, int quantity) {
+        // Check if item already exists in sale
+        SaleLineItem existingItem = findExistingItem(itemDTO.getItemID());
 
+        if (existingItem != null) {
+            // Update quantity for existing item
+            existingItem.incrementQuantity(quantity);
+        } else {
+            // Add new item to sale
+            addNewItem(itemDTO, quantity);
+        }
+    }
+
+    /**
+     * Finds an existing item in the sale by ID.
+     *
+     * @param itemID The item identifier to search for.
+     * @return The matching SaleLineItem or null if not found.
+     */
+    private SaleLineItem findExistingItem(String itemID) {
         for (SaleLineItem item : items) {
-            if (item.getItem().getItemID().equals(itemDTO.getItemID())) {
-                item.incrementQuantity(quantity);
-                return true;
+            if (item.getItem().getItemID().equals(itemID)) {
+                return item;
             }
         }
+        return null;
+    }
 
+    /**
+     * Adds a new item with the specified quantity to the sale.
+     *
+     * @param itemDTO The item to add.
+     * @param quantity The quantity of the item.
+     */
+    private void addNewItem(ItemDTO itemDTO, int quantity) {
         SaleLineItem newLineItem = new SaleLineItem(itemDTO, quantity);
         items.add(newLineItem);
-        return true;
+    }
+
+    /**
+     * Gets the list of items in the sale.
+     *
+     * @return A copy of the list of sale line items.
+     */
+    public List<SaleLineItem> getItems() {
+        return new ArrayList<>(items);
     }
 
     /**
@@ -94,33 +123,8 @@ public class Sale {
      * @return The total price after discount.
      */
     public Amount applyDiscount(CustomerDTO customer, Amount discountAmount) {
-        this.customer = customer;
         this.discountAmount = discountAmount;
         return calculateTotalWithVat();
-    }
-
-    /**
-     * Handles payment for this sale.
-     *
-     * @param payment The payment used to pay for the sale.
-     * @return The change amount to be given back to the customer.
-     */
-    public Amount pay(Payment payment) {
-        this.payment = payment;
-        Amount change = ((CashPayment) payment).getChange(calculateTotalWithVat());
-        this.receipt = new Receipt(this, payment.getAmount(), change);
-        return change;
-    }
-
-    /**
-     * Prints a receipt for the current sale on the specified printer.
-     *
-     * @param printer The printer where the receipt is printed.
-     */
-    public void printReceipt(Printer printer) {
-        if (receipt != null) {
-            printer.printReceipt(receipt);
-        }
     }
 
     /**
@@ -142,17 +146,35 @@ public class Sale {
     }
 
     /**
-     * Gets the list of items in the sale.
+     * Processes payment for this sale and generates a receipt.
      *
-     * @return The list of sale line items.
+     * @param payment The payment used to pay for the sale.
+     * @return The change amount to be given back to the customer.
      */
-    public List<SaleLineItem> getItems() {
-        return new ArrayList<>(items);
+    public Amount pay(CashPayment payment) {
+        Amount totalToPay = calculateTotalWithVat();
+        Amount change = payment.getChange(totalToPay);
+
+        // Generate receipt with sale, payment, and change details
+        this.receipt = new Receipt(this, payment.getAmount(), change);
+
+        return change;
     }
-    
+
+    /**
+     * Prints a receipt for the current sale on the specified printer.
+     *
+     * @param printer The printer where the receipt is printed.
+     */
+    public void printReceipt(Printer printer) {
+        if (receipt != null) {
+            printer.printReceipt(receipt);
+        }
+    }
+
     /**
      * Updates inventory with all items in this sale.
-     * 
+     *
      * @param itemRegistry The registry to update inventory in
      * @return true if all updates were successful, false if any failed
      */

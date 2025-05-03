@@ -29,7 +29,7 @@ public class CashRegister {
      *
      * @param payment The payment to record.
      */
-    public void addPayment(Payment payment) {
+    public void addPayment(CashPayment payment) {
         balance = balance.add(payment.getAmount());
     }
 
