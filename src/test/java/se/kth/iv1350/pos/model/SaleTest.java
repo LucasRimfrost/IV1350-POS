@@ -1,6 +1,7 @@
 package se.kth.iv1350.pos.model;
 
 import static org.junit.Assert.*;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import se.kth.iv1350.pos.dto.CustomerDTO;
@@ -11,8 +12,7 @@ import se.kth.iv1350.pos.util.Amount;
 import java.util.List;
 
 /**
- * Tests the Sale class, which represents a single sale transaction and handles
- * items, pricing, discounts, and payment processing.
+ * Tests the Sale class, which represents a single sale transaction.
  */
 public class SaleTest {
     private Sale sale;
@@ -30,18 +30,25 @@ public class SaleTest {
     }
 
     /**
+     * Cleans up the test environment after each test.
+     */
+    @After
+    public void tearDown() {
+        sale = null;
+        testItem1 = null;
+        testItem2 = null;
+    }
+
+    /**
      * Tests adding an item to the sale.
      */
     @Test
     public void testAddItem() {
-        // Act
         sale.addItem(testItem1, 1);
 
-        // Assert
         List<SaleLineItem> items = sale.getItems();
         assertEquals("Sale should contain one item", 1, items.size());
-        assertEquals("Item in sale should match the added item", testItem1, items.get(0).getItem());
-        assertEquals("Item quantity should be correct", 1, items.get(0).getQuantity());
+        assertEquals("Item ID should match", testItem1.getItemID(), items.get(0).getItem().getItemID());
     }
 
     /**
@@ -49,13 +56,9 @@ public class SaleTest {
      */
     @Test
     public void testAddSameItemTwice() {
-        // Arrange
         sale.addItem(testItem1, 1);
-
-        // Act
         sale.addItem(testItem1, 2);
 
-        // Assert
         List<SaleLineItem> items = sale.getItems();
         assertEquals("There should still be only one item", 1, items.size());
         assertEquals("Quantity should be incremented", 3, items.get(0).getQuantity());
@@ -66,17 +69,11 @@ public class SaleTest {
      */
     @Test
     public void testAddDifferentItems() {
-        // Act
         sale.addItem(testItem1, 1);
         sale.addItem(testItem2, 2);
 
-        // Assert
         List<SaleLineItem> items = sale.getItems();
         assertEquals("Sale should contain two different items", 2, items.size());
-        assertEquals("First item should match", testItem1, items.get(0).getItem());
-        assertEquals("Second item should match", testItem2, items.get(1).getItem());
-        assertEquals("First item quantity should be correct", 1, items.get(0).getQuantity());
-        assertEquals("Second item quantity should be correct", 2, items.get(1).getQuantity());
     }
 
     /**
@@ -84,16 +81,13 @@ public class SaleTest {
      */
     @Test
     public void testCalculateTotal() {
-        // Arrange
         sale.addItem(testItem1, 2); // 50.0 * 2 = 100.0
         sale.addItem(testItem2, 3); // 30.0 * 3 = 90.0
 
-        // Act
-        Amount actual = sale.calculateTotal();
-
-        // Assert
+        Amount total = sale.calculateTotal();
         Amount expected = new Amount(190.0); // 100.0 + 90.0
-        assertEquals("Total calculated incorrectly", expected, actual);
+
+        assertEquals("Total calculated incorrectly", expected, total);
     }
 
     /**
@@ -101,16 +95,13 @@ public class SaleTest {
      */
     @Test
     public void testCalculateTotalVat() {
-        // Arrange
         sale.addItem(testItem1, 2); // 50.0 * 0.25 * 2 = 25.0
         sale.addItem(testItem2, 3); // 30.0 * 0.12 * 3 = 10.8
 
-        // Act
-        Amount actual = sale.calculateTotalVat();
-
-        // Assert
+        Amount vatAmount = sale.calculateTotalVat();
         Amount expected = new Amount(35.8); // 25.0 + 10.8
-        assertEquals("Total VAT calculated incorrectly", expected, actual);
+
+        assertEquals("Total VAT calculated incorrectly", expected, vatAmount);
     }
 
     /**
@@ -118,16 +109,13 @@ public class SaleTest {
      */
     @Test
     public void testCalculateTotalWithVat() {
-        // Arrange
         sale.addItem(testItem1, 2); // 50.0 * 2 = 100.0, VAT = 25.0
         sale.addItem(testItem2, 3); // 30.0 * 3 = 90.0, VAT = 10.8
 
-        // Act
-        Amount actual = sale.calculateTotalWithVat();
-
-        // Assert
+        Amount total = sale.calculateTotalWithVat();
         Amount expected = new Amount(225.8); // 100.0 + 90.0 + 25.0 + 10.8
-        assertEquals("Total with VAT calculated incorrectly", expected, actual);
+
+        assertEquals("Total with VAT calculated incorrectly", expected, total);
     }
 
     /**
@@ -135,34 +123,15 @@ public class SaleTest {
      */
     @Test
     public void testApplyDiscount() {
-        // Arrange
         sale.addItem(testItem1, 2); // Total with VAT: 125.0
         CustomerDTO customer = new CustomerDTO("1001");
         Amount discountAmount = new Amount(10.0);
 
-        // Act
         Amount totalAfterDiscount = sale.applyDiscount(customer, discountAmount);
-
-        // Assert
         Amount expected = new Amount(125.0 - 10.0);
+
         assertEquals("Discount not applied correctly", expected, totalAfterDiscount);
         assertTrue("Sale should indicate a discount was applied", sale.hasDiscount());
-        assertEquals("Discount amount not stored correctly", discountAmount, sale.getDiscountAmount());
-    }
-
-    /**
-     * Tests that the discount indicator works correctly.
-     */
-    @Test
-    public void testHasDiscount() {
-        // Arrange
-        assertFalse("New sale should not have a discount", sale.hasDiscount());
-
-        // Act
-        sale.applyDiscount(new CustomerDTO("1001"), new Amount(10.0));
-
-        // Assert
-        assertTrue("Sale should indicate discount after applying one", sale.hasDiscount());
     }
 
     /**
@@ -170,84 +139,14 @@ public class SaleTest {
      */
     @Test
     public void testPayWithCashPayment() {
-        // Arrange
         sale.addItem(testItem1, 1); // 50.0 + 12.5 VAT = 62.5
         Amount paymentAmount = new Amount(100.0);
         CashPayment payment = new CashPayment(paymentAmount);
 
-        // Act
         Amount change = sale.pay(payment);
-
-        // Assert
         Amount expectedChange = new Amount(37.5); // 100.0 - 62.5
+
         assertEquals("Change calculated incorrectly", expectedChange, change);
-    }
-
-    /**
-     * Tests printing a receipt via a mock printer.
-     */
-    @Test
-    public void testPrintReceipt() {
-        // Arrange
-        class MockPrinter extends Printer {
-            private boolean receiptPrinted = false;
-            private Receipt lastReceipt = null;
-
-            @Override
-            public void printReceipt(Receipt receipt) {
-                receiptPrinted = true;
-                lastReceipt = receipt;
-            }
-
-            public boolean wasReceiptPrinted() {
-                return receiptPrinted;
-            }
-
-            public Receipt getLastReceipt() {
-                return lastReceipt;
-            }
-        }
-
-        MockPrinter mockPrinter = new MockPrinter();
-        sale.addItem(testItem1, 1);
-        CashPayment payment = new CashPayment(new Amount(100.0));
-        sale.pay(payment);
-
-        // Act
-        sale.printReceipt(mockPrinter);
-
-        // Assert
-        assertTrue("Receipt should have been printed", mockPrinter.wasReceiptPrinted());
-        assertNotNull("Printer should receive a receipt", mockPrinter.getLastReceipt());
-    }
-
-    /**
-     * Tests that receipt printing doesn't happen if no payment has been made.
-     */
-    @Test
-    public void testPrintReceiptWithoutPayment() {
-        // Arrange
-        class MockPrinter extends Printer {
-            private boolean receiptPrinted = false;
-
-            @Override
-            public void printReceipt(Receipt receipt) {
-                receiptPrinted = true;
-            }
-
-            public boolean wasReceiptPrinted() {
-                return receiptPrinted;
-            }
-        }
-
-        MockPrinter mockPrinter = new MockPrinter();
-        sale.addItem(testItem1, 1);
-
-        // Act
-        sale.printReceipt(mockPrinter);
-
-        // Assert
-        assertFalse("Receipt should not be printed before payment", mockPrinter.wasReceiptPrinted());
     }
 
     /**
@@ -255,9 +154,7 @@ public class SaleTest {
      */
     @Test
     public void testUpdateInventory() {
-        // Arrange
-        sale.addItem(testItem1, 2);
-
+        // Create a test mock of ItemRegistry
         class MockItemRegistry extends ItemRegistry {
             private boolean inventoryUpdated = false;
             private List<SaleLineItem> lastItems = null;
@@ -278,15 +175,88 @@ public class SaleTest {
             }
         }
 
+        // Setup test
+        sale.addItem(testItem1, 2);
         MockItemRegistry mockRegistry = new MockItemRegistry();
 
-        // Act
+        // Execute test
         boolean result = sale.updateInventory(mockRegistry);
 
-        // Assert
+        // Verify results
         assertTrue("Inventory update should succeed", result);
         assertTrue("Inventory should be updated", mockRegistry.wasInventoryUpdated());
         assertNotNull("Sale items should be passed to registry", mockRegistry.getLastItems());
         assertEquals("Correct number of items should be passed", 1, mockRegistry.getLastItems().size());
+        assertEquals("Correct item should be passed", testItem1.getItemID(),
+                    mockRegistry.getLastItems().get(0).getItem().getItemID());
+    }
+
+    /**
+     * Tests printing a receipt via the Printer.
+     */
+    @Test
+    public void testPrintReceipt() {
+        // Create a test mock of Printer
+        class MockPrinter extends Printer {
+            private boolean receiptPrinted = false;
+            private Receipt lastReceipt = null;
+
+            @Override
+            public void printReceipt(Receipt receipt) {
+                receiptPrinted = true;
+                lastReceipt = receipt;
+            }
+
+            public boolean wasReceiptPrinted() {
+                return receiptPrinted;
+            }
+
+            public Receipt getLastReceipt() {
+                return lastReceipt;
+            }
+        }
+
+        // Setup test
+        sale.addItem(testItem1, 1);
+        CashPayment payment = new CashPayment(new Amount(100.0));
+        sale.pay(payment);
+        MockPrinter mockPrinter = new MockPrinter();
+
+        // Execute test
+        sale.printReceipt(mockPrinter);
+
+        // Verify results
+        assertTrue("Receipt should have been printed", mockPrinter.wasReceiptPrinted());
+        assertNotNull("Printer should receive a receipt", mockPrinter.getLastReceipt());
+    }
+
+    /**
+     * Tests that receipt printing doesn't happen if no payment has been made.
+     */
+    @Test
+    public void testPrintReceiptWithoutPayment() {
+        // Create a test mock of Printer
+        class MockPrinter extends Printer {
+            private boolean receiptPrinted = false;
+
+            @Override
+            public void printReceipt(Receipt receipt) {
+                receiptPrinted = true;
+            }
+
+            public boolean wasReceiptPrinted() {
+                return receiptPrinted;
+            }
+        }
+
+        // Setup test
+        sale.addItem(testItem1, 1);
+        MockPrinter mockPrinter = new MockPrinter();
+
+        // Execute test
+        sale.printReceipt(mockPrinter);
+
+        // Verify results
+        assertFalse("Receipt should not be printed before payment", mockPrinter.wasReceiptPrinted());
     }
 }

@@ -1,47 +1,46 @@
-# pos-system
+# Point-of-Sale System
 
-## Beskrivning
-Ett Java-projekt skapat med Maven.
+## Project Description
+This Point-of-Sale (POS) system is a Java application developed with Maven for the Object-Oriented Design (IV1350) course. The system handles sales processing, inventory management, and receipt generation following object-oriented design principles.
 
-## Bygga och köra
+## Features
+- Process sales with multiple items
+- Calculate prices including VAT
+- Apply customer discounts
+- Process payments and calculate change
+- Generate receipts
+- Update inventory
 
-### Förutsättningar
-- Java 21 eller högre
-- Maven 3.6 eller högre
+## System Architecture
+The application follows a layered architecture with Model-View-Controller (MVC) pattern:
 
-### Kommandon
+- **View Layer**: User interface that displays information and captures user input
+- **Controller Layer**: Coordinates operations between view and model
+- **Model Layer**: Contains core business logic and domain objects
+- **Integration Layer**: Handles external system communication (accounting, inventory)
+- **Utility Layer**: Provides supporting functionality like Amount class
 
-För att kompilera projektet:
-```
+## Building and Running
+
+### Prerequisites
+- JDK 17 or higher
+- Maven 3.6 or higher
+
+### Commands
+To compile the project:
+```bash
 make compile
 ```
-
-För att köra applikationen:
+To run unit tests:
+```bash
+make test
 ```
+To run the application:
+```bash
 make run
 ```
 
-För att paketera applikationen:
-```
-make package
-```
-
-För att köra den paketerade applikationen:
-```
-make run-jar
-```
-
-För att rensa projektet:
-```
+To clean compiled files:
+```bash
 make clean
 ```
-
-För fler kommandon, kör:
-```
-make help
-```
-
-## Projektstruktur
-- `src/main/java/` - Java-källfiler
-- `src/test/java/` - Test-källfiler
-- `target/` - Kompilerade klasser och paket
