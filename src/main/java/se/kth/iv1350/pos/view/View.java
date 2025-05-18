@@ -1,7 +1,10 @@
 package se.kth.iv1350.pos.view;
 
 import se.kth.iv1350.pos.controller.Controller;
+import se.kth.iv1350.pos.controller.OperationFailedException;
 import se.kth.iv1350.pos.dto.ItemDTO;
+import se.kth.iv1350.pos.exception.DatabaseConnectionException;
+import se.kth.iv1350.pos.exception.ItemNotFoundException;
 import se.kth.iv1350.pos.util.Amount;
 
 /**
@@ -33,6 +36,14 @@ public class View {
 
         completeSale();
         processPayment();
+
+        // Test error handling with invalid item
+        printDivider("Testing error handling with invalid item");
+        scanItem("InvalidItemID", 1);
+
+        // Test error handling with database error
+        printDivider("Testing error handling with database connection failure");
+        scanItem("999", 1);
     }
 
 
@@ -112,24 +123,48 @@ public class View {
 
     /**
      * Handles the scanning of an item, displaying appropriate information.
+     * Catches and handles exceptions for error cases.
      *
      * @param itemID The identifier of the item being scanned
      * @param quantity The quantity of the item
      */
     private void scanItem(String itemID, int quantity) {
-        Controller.ItemWithRunningTotal result = controller.enterItem(itemID, quantity);
+        try {
+            Controller.ItemWithRunningTotal result = controller.enterItem(itemID, quantity);
 
-        if (result != null) {
-            displayItemInfo(result.getItem());
+            if (result != null) {
+                displayItemInfo(result.getItem());
 
-            if (result.isDuplicate()) {
-                System.out.println("This item was already in the sale. Quantity has been updated.");
+                if (result.isDuplicate()) {
+                    System.out.println("This item was already in the sale. Quantity has been updated.");
+                }
+
+                displayRunningTotal(result.getRunningTotal());
             }
-
-            displayRunningTotal(result.getRunningTotal());
-        } else {
-            displayItemNotFound(itemID);
+        } catch (OperationFailedException e) {
+            handleException(e);
         }
+    }
+
+    /**
+     * Handles exceptions by displaying user-friendly error messages.
+     *
+     * @param e The exception to handle
+     */
+    private void handleException(OperationFailedException e) {
+        String errorMsg = "";
+
+        if (e.getCause() instanceof ItemNotFoundException) {
+            ItemNotFoundException ex = (ItemNotFoundException) e.getCause();
+            errorMsg = "ERROR: Item with ID " + ex.getItemID() + " was not found in inventory!";
+        } else if (e.getCause() instanceof DatabaseConnectionException) {
+            errorMsg = "ERROR: Could not connect to the database. Please try again later.";
+        } else {
+            errorMsg = "An error occurred: " + e.getMessage();
+        }
+
+        System.out.println(errorMsg);
+        System.out.println();
     }
 
     /**
@@ -160,16 +195,6 @@ public class View {
     }
 
     /**
-     * Displays a message when an item is not found.
-     *
-     * @param itemID The identifier of the item that was not found
-     */
-    private void displayItemNotFound(String itemID) {
-        System.out.println("Item with ID " + itemID + " not found in inventory!");
-        System.out.println();
-    }
-
-    /**
      * Formats a monetary amount according to requirements.
      *
      * @param amount The amount to format
@@ -194,6 +219,6 @@ public class View {
      * @param title The section title
      */
     private void printDivider(String title) {
-        System.out.println(title);
+        System.out.println("\n==== " + title + " ====");
     }
 }

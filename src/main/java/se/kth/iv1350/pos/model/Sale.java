@@ -14,6 +14,7 @@ import se.kth.iv1350.pos.util.Amount;
  */
 public class Sale {
     private final List<SaleLineItem> items;
+    private final List<SaleObserver> observers;
     private Amount discountAmount;
     private Receipt receipt;
 
@@ -22,7 +23,28 @@ public class Sale {
      */
     public Sale() {
         this.items = new ArrayList<>();
+        this.observers = new ArrayList<>();
         this.discountAmount = new Amount();
+    }
+
+    /**
+     * Adds an observer that will be notified of sale events.
+     *
+     * @param observer The observer to add.
+     */
+    public void addSaleObserver(SaleObserver observer) {
+        observers.add(observer);
+    }
+
+    /**
+     * Notifies all observers that a sale has been completed.
+     *
+     * @param saleAmount The total amount of the completed sale.
+     */
+    private void notifyObservers(Amount saleAmount) {
+        for (SaleObserver observer : observers) {
+            observer.newSaleCompleted(saleAmount);
+        }
     }
 
     /**
@@ -147,6 +169,7 @@ public class Sale {
 
     /**
      * Processes payment for this sale and generates a receipt.
+     * Notifies observers about the completed sale.
      *
      * @param payment The payment used to pay for the sale.
      * @return The change amount to be given back to the customer.
@@ -157,6 +180,9 @@ public class Sale {
 
         // Generate receipt with sale, payment, and change details
         this.receipt = new Receipt(this, payment.getAmount(), change);
+
+        // Notify observers of the completed sale
+        notifyObservers(totalToPay);
 
         return change;
     }

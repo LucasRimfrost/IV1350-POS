@@ -1,0 +1,32 @@
+2025-05-18 20:44:20: se.kth.iv1350.pos.exception.ItemNotFoundException: Item with ID InvalidItemID was not found in inventory.
+se.kth.iv1350.pos.exception.ItemNotFoundException: Item with ID InvalidItemID was not found in inventory.
+	at se.kth.iv1350.pos.integration.ItemRegistry.findItem(ItemRegistry.java:45)
+	at se.kth.iv1350.pos.controller.Controller.enterItem(Controller.java:105)
+	at se.kth.iv1350.pos.view.View.scanItem(View.java:133)
+	at se.kth.iv1350.pos.view.View.runFakeExecution(View.java:42)
+	at se.kth.iv1350.pos.startup.Main.main(Main.java:45)
+-------------------
+2025-05-18 20:44:20: se.kth.iv1350.pos.exception.DatabaseConnectionException: Could not connect to inventory database
+se.kth.iv1350.pos.exception.DatabaseConnectionException: Could not connect to inventory database
+	at se.kth.iv1350.pos.integration.ItemRegistry.findItem(ItemRegistry.java:40)
+	at se.kth.iv1350.pos.controller.Controller.enterItem(Controller.java:105)
+	at se.kth.iv1350.pos.view.View.scanItem(View.java:133)
+	at se.kth.iv1350.pos.view.View.runFakeExecution(View.java:46)
+	at se.kth.iv1350.pos.startup.Main.main(Main.java:45)
+-------------------
+2025-05-18 20:52:27: se.kth.iv1350.pos.exception.ItemNotFoundException: Item with ID InvalidItemID was not found in inventory.
+se.kth.iv1350.pos.exception.ItemNotFoundException: Item with ID InvalidItemID was not found in inventory.
+	at se.kth.iv1350.pos.integration.ItemRegistry.findItem(ItemRegistry.java:45)
+	at se.kth.iv1350.pos.controller.Controller.enterItem(Controller.java:104)
+	at se.kth.iv1350.pos.view.View.scanItem(View.java:133)
+	at se.kth.iv1350.pos.view.View.runFakeExecution(View.java:42)
+	at se.kth.iv1350.pos.startup.Main.main(Main.java:45)
+-------------------
+2025-05-18 20:52:27: se.kth.iv1350.pos.exception.DatabaseConnectionException: Could not connect to inventory database
+se.kth.iv1350.pos.exception.DatabaseConnectionException: Could not connect to inventory database
+	at se.kth.iv1350.pos.integration.ItemRegistry.findItem(ItemRegistry.java:40)
+	at se.kth.iv1350.pos.controller.Controller.enterItem(Controller.java:104)
+	at se.kth.iv1350.pos.view.View.scanItem(View.java:133)
+	at se.kth.iv1350.pos.view.View.runFakeExecution(View.java:46)
+	at se.kth.iv1350.pos.startup.Main.main(Main.java:45)
+-------------------

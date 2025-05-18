@@ -2,22 +2,37 @@ package se.kth.iv1350.pos.integration;
 
 /**
  * This class creates all registry classes, providing a single access point
- * to all external systems.
+ * to all external systems. This class is implemented as a singleton.
  */
 public class RegistryCreator {
+    private static RegistryCreator instance;
+
     private final ItemRegistry itemRegistry;
     private final DiscountRegistry discountRegistry;
     private final AccountingSystem accountingSystem;
     private final Printer printer;
 
     /**
-     * Creates a new instance and initializes all needed registry classes and external system interfaces.
+     * Private constructor to prevent external instantiation.
+     * Initializes all needed registry classes and external system interfaces.
      */
-    public RegistryCreator() {
+    private RegistryCreator() {
         itemRegistry = new ItemRegistry();
         discountRegistry = new DiscountRegistry();
         accountingSystem = new AccountingSystem();
         printer = new Printer();
+    }
+
+    /**
+     * Gets the singleton instance of the RegistryCreator.
+     *
+     * @return The singleton instance.
+     */
+    public static RegistryCreator getInstance() {
+        if (instance == null) {
+            instance = new RegistryCreator();
+        }
+        return instance;
     }
 
     /**

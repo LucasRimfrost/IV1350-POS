@@ -9,17 +9,20 @@ import se.kth.iv1350.pos.integration.DiscountRegistry;
 import se.kth.iv1350.pos.integration.ItemRegistry;
 import se.kth.iv1350.pos.integration.Printer;
 import se.kth.iv1350.pos.integration.RegistryCreator;
+import se.kth.iv1350.pos.exception.DatabaseConnectionException;
+import se.kth.iv1350.pos.exception.ItemNotFoundException;
 import se.kth.iv1350.pos.model.CashPayment;
 import se.kth.iv1350.pos.model.CashRegister;
 import se.kth.iv1350.pos.model.Sale;
+import se.kth.iv1350.pos.model.SaleObserver;
 import se.kth.iv1350.pos.model.SaleLineItem;
 import se.kth.iv1350.pos.util.Amount;
+import se.kth.iv1350.pos.util.ErrorLogger;
 
 /**
  * This is the application's controller. All calls to the model and integration
  * layers pass through this class. It coordinates the processes of the Point-of-Sale
- * system including starting sales, entering items, applying discounts, handling payments,
- * and notifying external systems.
+ * system.
  */
 public class Controller {
     // External systems and registries
@@ -30,22 +33,11 @@ public class Controller {
 
     // Internal components
     private final CashRegister cashRegister;
-    private final List<ExternalSystemObserver> externalSystemObservers;
+    private final List<SaleObserver> saleObservers;
+    private final ErrorLogger errorLogger;
 
     // Current transaction
     private Sale currentSale;
-
-    /**
-     * Interface for external systems that need to be notified of sale events.
-     */
-    public interface ExternalSystemObserver {
-        /**
-         * Called when a sale is completed with payment.
-         *
-         * @param completedSale The sale that was completed
-         */
-        void saleCompleted(Sale completedSale);
-    }
 
     /**
      * Creates a new instance.
@@ -61,24 +53,34 @@ public class Controller {
 
         // Initialize internal components
         this.cashRegister = new CashRegister();
-        this.externalSystemObservers = new ArrayList<>();
+        this.saleObservers = new ArrayList<>();
+        this.errorLogger = new ErrorLogger();
     }
 
     /**
      * Adds an observer that will be notified of sale events.
+     * The observer will be notified when a sale is completed with payment.
      *
-     * @param observer The observer to add
+     * @param observer The observer to add.
      */
-    public void addExternalSystemObserver(ExternalSystemObserver observer) {
-        externalSystemObservers.add(observer);
+    public void addSaleObserver(SaleObserver observer) {
+        saleObservers.add(observer);
+        if (currentSale != null) {
+            currentSale.addSaleObserver(observer);
+        }
     }
 
     /**
      * Starts a new sale. This method must be called before doing anything else with the sale.
-     * Initializes a new Sale object to manage the current transaction.
+     * Initializes a new Sale object to manage the current transaction and registers observers.
      */
     public void startNewSale() {
         currentSale = new Sale();
+
+        // Register all observers with the new sale
+        for (SaleObserver observer : saleObservers) {
+            currentSale.addSaleObserver(observer);
+        }
     }
 
     /**
@@ -89,27 +91,33 @@ public class Controller {
      * @param quantity The quantity of the specified item.
      * @return Information about the entered item, including price and description.
      *         Returns null if the item does not exist or no sale has been started.
+     * @throws OperationFailedException If the item cannot be found or if there's a database connection issue.
      */
-    public ItemWithRunningTotal enterItem(String itemID, int quantity) {
+    public ItemWithRunningTotal enterItem(String itemID, int quantity) throws OperationFailedException {
         // Check if sale has been started
         if (currentSale == null) {
             return null; // No sale started
         }
 
-        // Find the item in inventory
-        ItemDTO item = itemRegistry.findItem(itemID);
-        if (item == null) {
-            return null; // Item not found
+        try {
+            // Find the item in inventory
+            ItemDTO item = itemRegistry.findItem(itemID);
+
+            // Check if this item is already in the sale
+            boolean isDuplicate = isItemAlreadyInSale(itemID);
+
+            // Add the item to the sale
+            currentSale.addItem(item, quantity);
+
+            // Return information about the entered item and updated totals
+            return new ItemWithRunningTotal(item, currentSale.calculateTotalWithVat(), isDuplicate);
+        } catch (ItemNotFoundException exception) {
+            errorLogger.logException(exception);
+            throw new OperationFailedException("Item not found", exception);
+        } catch (DatabaseConnectionException exception) {
+            errorLogger.logException(exception);
+            throw new OperationFailedException("Database unavailable", exception);
         }
-
-        // Check if this item is already in the sale
-        boolean isDuplicate = isItemAlreadyInSale(itemID);
-
-        // Add the item to the sale
-        currentSale.addItem(item, quantity);
-
-        // Return information about the entered item and updated totals
-        return new ItemWithRunningTotal(item, currentSale.calculateTotalWithVat(), isDuplicate);
     }
 
     /**
@@ -232,13 +240,15 @@ public class Controller {
         updateAccountingRecords();
 
         // Update inventory
-        currentSale.updateInventory(itemRegistry);
+        try {
+            currentSale.updateInventory(itemRegistry);
+        } catch (Exception e) {
+            errorLogger.logException(e);
+            // Continue with transaction completion even if inventory update fails
+        }
 
         // Print receipt
         currentSale.printReceipt(printer);
-
-        // Notify external systems
-        notifyExternalSystems();
     }
 
     /**
@@ -249,22 +259,12 @@ public class Controller {
             return; // Safety check
         }
 
-        accountingSystem.recordSale(currentSale);
-        accountingSystem.updateSalesStatistics(currentSale.calculateTotalWithVat());
-    }
-
-    /**
-     * Notifies all registered external systems about the completed sale.
-     */
-    private void notifyExternalSystems() {
-        if (currentSale == null || externalSystemObservers == null) {
-            return; // Safety check
-        }
-
-        for (ExternalSystemObserver observer : externalSystemObservers) {
-            if (observer != null) {
-                observer.saleCompleted(currentSale);
-            }
+        try {
+            accountingSystem.recordSale(currentSale);
+            accountingSystem.updateSalesStatistics(currentSale.calculateTotalWithVat());
+        } catch (Exception e) {
+            errorLogger.logException(e);
+            // Continue with transaction completion even if accounting update fails
         }
     }
 
@@ -299,11 +299,16 @@ public class Controller {
             return new Amount(0); // Safety check, return zero discount
         }
 
-        return discountRegistry.getDiscount(
-            currentSale.getItems(),
-            currentSale.calculateTotalWithVat(),
-            customerID
-        );
+        try {
+            return discountRegistry.getDiscount(
+                currentSale.getItems(),
+                currentSale.calculateTotalWithVat(),
+                customerID
+            );
+        } catch (Exception e) {
+            errorLogger.logException(e);
+            return new Amount(0); // Return zero discount if calculation fails
+        }
     }
 
     /**
@@ -325,5 +330,17 @@ public class Controller {
             return null; // No sale in progress
         }
         return currentSale.calculateTotalVat();
+    }
+
+    /**
+     * Closes all resources held by the controller.
+     * Should be called when shutting down the application.
+     */
+    public void close() {
+        try {
+            errorLogger.close();
+        } catch (Exception e) {
+            System.err.println("Error closing controller resources: " + e.getMessage());
+        }
     }
 }
