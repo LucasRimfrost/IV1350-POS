@@ -14,7 +14,6 @@ import se.kth.iv1350.pos.util.Amount;
  * This class is responsible for retrieving item information and updating inventory.
  */
 public class ItemRegistry {
-    // Store items and their inventory levels
     private final Map<String, ItemDTO> items = new HashMap<>();
     private final Map<String, Integer> inventory = new HashMap<>();
 
@@ -35,7 +34,6 @@ public class ItemRegistry {
      * @throws DatabaseConnectionException If the database server cannot be called.
      */
     public ItemDTO findItem(String itemID) throws ItemNotFoundException, DatabaseConnectionException {
-        // Simulate database failure for a specific item ID
         if ("999".equals(itemID)) {
             throw new DatabaseConnectionException("Could not connect to inventory database");
         }
@@ -103,21 +101,12 @@ public class ItemRegistry {
             return false;
         }
 
-        // Update inventory and log the change
         inventory.put(itemID, currentQuantity - quantity);
         logInventoryDecrease(itemID, quantity);
 
         return true;
     }
 
-    /**
-     * Checks if an inventory update is possible based on available quantity.
-     *
-     * @param currentQuantity The current quantity in inventory.
-     * @param requestedQuantity The quantity requested for update.
-     * @param itemID The item identifier.
-     * @return true if the update is possible, false otherwise.
-     */
     private boolean isInventoryUpdatePossible(Integer currentQuantity, int requestedQuantity, String itemID) {
         if (currentQuantity == null || currentQuantity < requestedQuantity) {
             System.out.println("Inventory update failed: Insufficient quantity for item: " + itemID);
@@ -126,31 +115,15 @@ public class ItemRegistry {
         return true;
     }
 
-    /**
-     * Logs a message about inventory decrease.
-     *
-     * @param itemID The item identifier.
-     * @param quantity The quantity decreased.
-     */
     private void logInventoryDecrease(String itemID, int quantity) {
         System.out.println("Told external inventory system to decrease inventory quantity");
         System.out.println("of item " + itemID + " by " + quantity + " units.");
     }
 
-    /**
-     * Logs a failure to update inventory for a specific item.
-     *
-     * @param itemID The item identifier.
-     */
     private void logInventoryUpdateFailure(String itemID) {
         System.out.println("Warning: Failed to update inventory for item: " + itemID);
     }
 
-    /**
-     * Logs the summary of an inventory update operation.
-     *
-     * @param allSuccessful Whether all updates were successful.
-     */
     private void logUpdateSummary(boolean allSuccessful) {
         if (allSuccessful) {
             System.out.println("Inventory successfully updated for all items");
@@ -159,11 +132,7 @@ public class ItemRegistry {
         }
     }
 
-    /**
-     * Loads test item catalog with product information.
-     */
     private void loadTestItemCatalog() {
-        // Food items (12% VAT)
         items.put("1", new ItemDTO("1",
             "Kellogg's Cornflakes",
             "500g, whole grain, fortified with vitamins",
@@ -179,7 +148,6 @@ public class ItemRegistry {
             "1L, organic whole milk, pasteurized",
             new Amount(22.0), 0.12));
 
-        // Other items (25% VAT)
         items.put("4", new ItemDTO("4",
             "Wasa Crispbread",
             "275g, whole grain, low sugar",
@@ -191,11 +159,7 @@ public class ItemRegistry {
             new Amount(75.0), 0.25));
     }
 
-    /**
-     * Initializes test inventory with default quantities.
-     */
     private void initializeTestInventory() {
-        // Initialize test inventory with 50 of each item
         for (String itemID : items.keySet()) {
             inventory.put(itemID, 50);
         }

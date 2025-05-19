@@ -45,16 +45,6 @@ public class ErrorLogger {
     }
 
     /**
-     * Gets the current time formatted for log entries.
-     *
-     * @return The formatted current time string.
-     */
-    private String getCurrentTime() {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        return LocalDateTime.now().format(formatter);
-    }
-
-    /**
      * Closes the log file.
      * This method is automatically called when the logger is used with try-with-resources.
      */
@@ -62,5 +52,10 @@ public class ErrorLogger {
         if (logWriter != null) {
             logWriter.close();
         }
+    }
+
+    private String getCurrentTime() {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        return LocalDateTime.now().format(formatter);
     }
 }

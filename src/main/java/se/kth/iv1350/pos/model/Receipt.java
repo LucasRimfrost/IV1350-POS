@@ -10,7 +10,7 @@ public class Receipt {
     private final LocalDateTime saleTime;
     private final Amount paymentAmount;
     private final Amount changeAmount;
-    private final int AMOUNT_COLUMN = 40; // Increased to allow longer product names
+    private final int AMOUNT_COLUMN = 40;
 
     /**
      * Creates a new instance.
@@ -44,16 +44,14 @@ public class Receipt {
     }
 
     private void appendReceiptHeader(StringBuilder receipt) {
-        // Receipt header
         receipt.append("------------------ Begin receipt -------------------\n");
         receipt.append("Time of Sale : ").append(formatDateTime(saleTime)).append("\n\n");
     }
 
     private void appendItemDetails(StringBuilder receipt) {
-        // Items
         for (SaleLineItem lineItem : sale.getItems()) {
             String leftSide = String.format("%s %d x %s",
-                    lineItem.getItem().getName(), // No truncation - show full name
+                    lineItem.getItem().getName(),
                     lineItem.getQuantity(),
                     formatAmount(lineItem.getItem().getPrice()));
             receipt.append(formatLineWithAmount(leftSide, lineItem.getSubtotal())).append("\n");
@@ -67,31 +65,22 @@ public class Receipt {
     }
 
     private void appendPaymentDetails(StringBuilder receipt) {
-        // Payment details with consistent alignment
         receipt.append(formatLineWithAmount("Cash :", paymentAmount)).append("\n");
         receipt.append(formatLineWithAmount("Change :", changeAmount)).append("\n");
     }
 
     private void appendReceiptFooter(StringBuilder receipt) {
-        // Receipt footer
         receipt.append("------------------ End receipt ---------------------");
     }
 
-    /**
-     * Formats a line with right-aligned amount and "SEK" suffix
-     */
     private String formatLineWithAmount(String leftText, Amount amount) {
         return formatLineWithAmount(leftText, amount, true);
     }
 
-    /**
-     * Formats a line with right-aligned amount and optional "SEK" suffix
-     */
     private String formatLineWithAmount(String leftText, Amount amount, boolean includeSEK) {
         StringBuilder line = new StringBuilder(leftText);
         String amountStr = formatAmount(amount);
 
-        // Calculate spaces needed to position the amount exactly at AMOUNT_COLUMN
         int spacesNeeded = AMOUNT_COLUMN - line.length() - amountStr.length();
         if (spacesNeeded < 1) spacesNeeded = 1;
 

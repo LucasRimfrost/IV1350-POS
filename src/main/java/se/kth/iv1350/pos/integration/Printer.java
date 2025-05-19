@@ -12,7 +12,6 @@ public class Printer {
      * Creates a new instance.
      */
     public Printer() {
-        // Real implementation would initialize printer hardware integration
     }
 
     /**

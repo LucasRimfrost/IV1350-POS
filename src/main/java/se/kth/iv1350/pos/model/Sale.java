@@ -2,7 +2,6 @@ package se.kth.iv1350.pos.model;
 
 import java.util.ArrayList;
 import java.util.List;
-import se.kth.iv1350.pos.dto.CustomerDTO;
 import se.kth.iv1350.pos.dto.ItemDTO;
 import se.kth.iv1350.pos.integration.ItemRegistry;
 import se.kth.iv1350.pos.integration.Printer;
@@ -14,8 +13,6 @@ import se.kth.iv1350.pos.util.Amount;
  */
 public class Sale {
     private final List<SaleLineItem> items;
-    private final List<SaleObserver> observers;
-    private Amount discountAmount;
     private Receipt receipt;
 
     /**
@@ -23,28 +20,6 @@ public class Sale {
      */
     public Sale() {
         this.items = new ArrayList<>();
-        this.observers = new ArrayList<>();
-        this.discountAmount = new Amount();
-    }
-
-    /**
-     * Adds an observer that will be notified of sale events.
-     *
-     * @param observer The observer to add.
-     */
-    public void addSaleObserver(SaleObserver observer) {
-        observers.add(observer);
-    }
-
-    /**
-     * Notifies all observers that a sale has been completed.
-     *
-     * @param saleAmount The total amount of the completed sale.
-     */
-    private void notifyObservers(Amount saleAmount) {
-        for (SaleObserver observer : observers) {
-            observer.newSaleCompleted(saleAmount);
-        }
     }
 
     /**
@@ -54,42 +29,13 @@ public class Sale {
      * @param quantity The quantity of the specified item.
      */
     public void addItem(ItemDTO itemDTO, int quantity) {
-        // Check if item already exists in sale
         SaleLineItem existingItem = findExistingItem(itemDTO.getItemID());
 
         if (existingItem != null) {
-            // Update quantity for existing item
             existingItem.incrementQuantity(quantity);
         } else {
-            // Add new item to sale
             addNewItem(itemDTO, quantity);
         }
-    }
-
-    /**
-     * Finds an existing item in the sale by ID.
-     *
-     * @param itemID The item identifier to search for.
-     * @return The matching SaleLineItem or null if not found.
-     */
-    private SaleLineItem findExistingItem(String itemID) {
-        for (SaleLineItem item : items) {
-            if (item.getItem().getItemID().equals(itemID)) {
-                return item;
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Adds a new item with the specified quantity to the sale.
-     *
-     * @param itemDTO The item to add.
-     * @param quantity The quantity of the item.
-     */
-    private void addNewItem(ItemDTO itemDTO, int quantity) {
-        SaleLineItem newLineItem = new SaleLineItem(itemDTO, quantity);
-        items.add(newLineItem);
     }
 
     /**
@@ -133,38 +79,7 @@ public class Sale {
      * @return The total price including VAT, after discounts.
      */
     public Amount calculateTotalWithVat() {
-        Amount total = calculateTotal().add(calculateTotalVat());
-        return total.subtract(discountAmount);
-    }
-
-    /**
-     * Applies the specified discount to this sale.
-     *
-     * @param customer The customer receiving the discount.
-     * @param discountAmount The discount amount.
-     * @return The total price after discount.
-     */
-    public Amount applyDiscount(CustomerDTO customer, Amount discountAmount) {
-        this.discountAmount = discountAmount;
-        return calculateTotalWithVat();
-    }
-
-    /**
-     * Checks if a discount has been applied to this sale.
-     *
-     * @return True if a discount has been applied, false otherwise.
-     */
-    public boolean hasDiscount() {
-        return discountAmount.isPositive();
-    }
-
-    /**
-     * Gets the discount amount applied to this sale.
-     *
-     * @return The discount amount.
-     */
-    public Amount getDiscountAmount() {
-        return discountAmount;
+        return calculateTotal().add(calculateTotalVat());
     }
 
     /**
@@ -174,16 +89,11 @@ public class Sale {
      * @param payment The payment used to pay for the sale.
      * @return The change amount to be given back to the customer.
      */
-    public Amount pay(CashPayment payment) {
+    public Amount processPayment(CashPayment payment) {
         Amount totalToPay = calculateTotalWithVat();
         Amount change = payment.getChange(totalToPay);
 
-        // Generate receipt with sale, payment, and change details
         this.receipt = new Receipt(this, payment.getAmount(), change);
-
-        // Notify observers of the completed sale
-        notifyObservers(totalToPay);
-
         return change;
     }
 
@@ -206,5 +116,19 @@ public class Sale {
      */
     public boolean updateInventory(ItemRegistry itemRegistry) {
         return itemRegistry.updateInventoryForCompletedSale(items);
+    }
+
+    private SaleLineItem findExistingItem(String itemID) {
+        for (SaleLineItem item : items) {
+            if (item.getItem().getItemID().equals(itemID)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private void addNewItem(ItemDTO itemDTO, int quantity) {
+        SaleLineItem newLineItem = new SaleLineItem(itemDTO, quantity);
+        items.add(newLineItem);
     }
 }

@@ -13,17 +13,6 @@ public class RegistryCreator {
     private final Printer printer;
 
     /**
-     * Private constructor to prevent external instantiation.
-     * Initializes all needed registry classes and external system interfaces.
-     */
-    private RegistryCreator() {
-        itemRegistry = new ItemRegistry();
-        discountRegistry = new DiscountRegistry();
-        accountingSystem = new AccountingSystem();
-        printer = new Printer();
-    }
-
-    /**
      * Gets the singleton instance of the RegistryCreator.
      *
      * @return The singleton instance.
@@ -69,5 +58,12 @@ public class RegistryCreator {
      */
     public Printer getPrinter() {
         return printer;
+    }
+
+    private RegistryCreator() {
+        itemRegistry = new ItemRegistry();
+        discountRegistry = new DiscountRegistry();
+        accountingSystem = new AccountingSystem();
+        printer = new Printer();
     }
 }

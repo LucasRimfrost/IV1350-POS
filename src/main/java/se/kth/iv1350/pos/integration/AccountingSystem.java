@@ -22,11 +22,9 @@ public class AccountingSystem {
      * @param sale The completed sale to record.
      */
     public void recordSale(Sale sale) {
-        // Extract financial data from the sale
         Amount totalPrice = sale.calculateTotal();
         Amount totalVAT = sale.calculateTotalVat();
 
-        // For demo purposes, output to console
         logSaleRecorded(totalPrice, totalVAT);
     }
 
@@ -37,27 +35,15 @@ public class AccountingSystem {
      * @param saleAmount The total amount from the completed sale.
      */
     public void updateSalesStatistics(Amount saleAmount) {
-        // For demo purposes, output to console
         logStatisticsUpdated(saleAmount);
     }
 
-    /**
-     * Logs information about a recorded sale.
-     *
-     * @param totalPrice The total price of the sale (excluding VAT)
-     * @param totalVAT The total VAT amount of the sale
-     */
     private void logSaleRecorded(Amount totalPrice, Amount totalVAT) {
         System.out.println("Sale recorded in accounting system:");
         System.out.println("  Total amount: " + totalPrice);
         System.out.println("  Total VAT: " + totalVAT);
     }
 
-    /**
-     * Logs information about updated sales statistics.
-     *
-     * @param saleAmount The amount that was added to the statistics
-     */
     private void logStatisticsUpdated(Amount saleAmount) {
         System.out.println("Sales statistics updated. Amount: " + saleAmount);
     }

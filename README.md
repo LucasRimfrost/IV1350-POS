@@ -29,18 +29,18 @@ The application follows a layered architecture with Model-View-Controller (MVC) 
 ### Commands
 To compile the project:
 ```bash
-make compile
+mvn compile
 ```
 To run unit tests:
 ```bash
-make test
+mvn test
 ```
 To run the application:
 ```bash
-make run
+java -cp target/classes se.kth.iv1350.pos.startup.Main
 ```
 
 To clean compiled files:
 ```bash
-make clean
+mvn clean
 ```

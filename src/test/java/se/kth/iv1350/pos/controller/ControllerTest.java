@@ -4,6 +4,9 @@ import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
+import se.kth.iv1350.pos.exception.DatabaseConnectionException;
+import se.kth.iv1350.pos.exception.ItemNotFoundException;
 import se.kth.iv1350.pos.integration.RegistryCreator;
 import se.kth.iv1350.pos.util.Amount;
 import java.math.BigDecimal;
@@ -20,7 +23,8 @@ public class ControllerTest {
      */
     @Before
     public void setUp() {
-        RegistryCreator creator = new RegistryCreator();
+        // Use getInstance() instead of constructor since RegistryCreator is now singleton
+        RegistryCreator creator = RegistryCreator.getInstance();
         controller = new Controller(creator);
     }
 
@@ -60,9 +64,30 @@ public class ControllerTest {
     @Test
     public void testEnterInvalidItem() {
         controller.startNewSale();
-        Controller.ItemWithRunningTotal result = controller.enterItem("999", 1);
+        try {
+            controller.enterItem("non-existent", 1);
+            fail("Should throw OperationFailedException for non-existent item");
+        } catch (OperationFailedException e) {
+            // Expected exception, test passed
+            assertTrue("Exception cause should be ItemNotFoundException",
+                       e.getCause() instanceof ItemNotFoundException);
+        }
+    }
 
-        assertNull("Result should be null for invalid item", result);
+    /**
+     * Tests database connection failure exception.
+     */
+    @Test
+    public void testDatabaseConnectionFailure() {
+        controller.startNewSale();
+        try {
+            controller.enterItem("999", 1);
+            fail("Should throw OperationFailedException for database connection failure");
+        } catch (OperationFailedException e) {
+            // Expected exception, test passed
+            assertTrue("Exception cause should be DatabaseConnectionException",
+                       e.getCause() instanceof DatabaseConnectionException);
+        }
     }
 
     /**
@@ -112,22 +137,6 @@ public class ControllerTest {
 
         assertEquals("End sale should return correct total",
                      0, expectedTotal.compareTo(total.getValue()));
-    }
-
-    /**
-     * Tests requesting a discount.
-     */
-    @Test
-    public void testRequestDiscount() {
-        controller.startNewSale();
-        controller.enterItem("1", 1); // Price 10.0 + VAT 1.2 = 11.2
-        Amount beforeDiscount = controller.endSale();
-
-        Amount afterDiscount = controller.requestDiscount("1001"); // 10% discount
-
-        assertNotNull("After discount total should not be null", afterDiscount);
-        assertTrue("Discount should make total smaller",
-                   afterDiscount.getValue().compareTo(beforeDiscount.getValue()) < 0);
     }
 
     /**
@@ -188,15 +197,6 @@ public class ControllerTest {
     }
 
     /**
-     * Tests requesting a discount when no sale has been started.
-     */
-    @Test
-    public void testRequestDiscountWithoutStartingSale() {
-        Amount discountedTotal = controller.requestDiscount("1001");
-        assertNull("Discounted total should be null when no sale has been started", discountedTotal);
-    }
-
-    /**
      * Tests processing payment when no sale has been started.
      */
     @Test
@@ -206,35 +206,75 @@ public class ControllerTest {
     }
 
     /**
-     * Tests observer notification when a sale is completed.
+     * Tests that appropriate exception is thrown when looking for a non-existent item.
      */
     @Test
-    public void testExternalSystemObserver() {
-        // Create a mock observer to verify notifications
-        class MockExternalSystemObserver implements Controller.ExternalSystemObserver {
-            private boolean notified = false;
-
-            @Override
-            public void saleCompleted(se.kth.iv1350.pos.model.Sale completedSale) {
-                notified = true;
-            }
-
-            public boolean wasNotified() {
-                return notified;
-            }
-        }
-
-        // Add the observer to the controller
-        MockExternalSystemObserver observer = new MockExternalSystemObserver();
-        controller.addExternalSystemObserver(observer);
-
-        // Process a complete sale
+    public void testEnterNonExistentItemException() {
         controller.startNewSale();
-        controller.enterItem("1", 1);
-        controller.endSale();
-        controller.processPayment(new Amount(20.0));
 
-        // Verify the observer was notified
-        assertTrue("External system observer should be notified of completed sale", observer.wasNotified());
+        try {
+            controller.enterItem("non-existent-id", 1);
+            fail("Should throw OperationFailedException for non-existent item");
+        } catch (OperationFailedException e) {
+            // Verify the cause is ItemNotFoundException
+            assertTrue("Cause should be ItemNotFoundException",
+                e.getCause() instanceof ItemNotFoundException);
+
+            // Verify the error message is correct
+            assertTrue("Error message should be informative",
+                e.getMessage().contains("Item not found"));
+
+            // Verify that original exception info is preserved
+            ItemNotFoundException cause = (ItemNotFoundException) e.getCause();
+            assertEquals("Original exception should contain correct item ID",
+                "non-existent-id", cause.getItemID());
+        }
+    }
+
+    /**
+     * Tests that appropriate exception is thrown when database connection fails.
+     */
+    @Test
+    public void testDatabaseConnectionFailureException() {
+        controller.startNewSale();
+
+        try {
+            // "999" is the special item ID that triggers database connection failure
+            controller.enterItem("999", 1);
+            fail("Should throw OperationFailedException for database connection failure");
+        } catch (OperationFailedException e) {
+            // Verify the cause is DatabaseConnectionException
+            assertTrue("Cause should be DatabaseConnectionException",
+                e.getCause() instanceof DatabaseConnectionException);
+
+            // Verify the error message is correct
+            assertTrue("Error message should mention database",
+                e.getMessage().contains("Database unavailable"));
+        }
+    }
+
+    /**
+     * Tests that controller state doesn't change when exception is thrown.
+     */
+    @Test
+    public void testNoStateChangeWhenExceptionThrown() {
+        // Start a new sale
+        controller.startNewSale();
+
+        // Add a valid item first
+        controller.enterItem("1", 1);
+
+        // Store current sale state
+        int initialItemCount = controller.getCurrentSale().getItems().size();
+
+        try {
+            // Try to enter a non-existent item, which will throw an exception
+            controller.enterItem("non-existent-id", 1);
+            fail("Should throw OperationFailedException");
+        } catch (OperationFailedException e) {
+            // Expected exception, now verify state hasn't changed
+            assertEquals("Sale item count should not change after exception",
+                initialItemCount, controller.getCurrentSale().getItems().size());
+        }
     }
 }
