@@ -52,5 +52,5 @@ To clone this project and access the seminar 4 implementation:
 
 ```bash
 # Clone the repository with the seminar4 branch directly
-git clone -b seminar4 https://github.com/YourUsername/IV1350-POS.git
+git clone -b seminar4 https://github.com/LucasRimfrost/IV1350-POS.git
 cd IV1350-POS
