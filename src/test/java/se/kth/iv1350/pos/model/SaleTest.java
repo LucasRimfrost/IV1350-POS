@@ -4,10 +4,7 @@ import static org.junit.Assert.*;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import se.kth.iv1350.pos.dto.CustomerDTO;
 import se.kth.iv1350.pos.dto.ItemDTO;
-import se.kth.iv1350.pos.integration.ItemRegistry;
-import se.kth.iv1350.pos.integration.Printer;
 import se.kth.iv1350.pos.util.Amount;
 import java.util.List;
 
@@ -48,7 +45,7 @@ public class SaleTest {
 
         List<SaleLineItem> items = sale.getItems();
         assertEquals("Sale should contain one item", 1, items.size());
-        assertEquals("Item ID should match", testItem1.getItemID(), items.get(0).getItem().getItemID());
+        assertEquals("Item ID should match", testItem1.itemID(), items.get(0).getItem().itemID());
     }
 
     /**
@@ -119,144 +116,55 @@ public class SaleTest {
     }
 
     /**
-     * Tests applying a discount to the sale.
-     */
-    @Test
-    public void testApplyDiscount() {
-        sale.addItem(testItem1, 2); // Total with VAT: 125.0
-        CustomerDTO customer = new CustomerDTO("1001");
-        Amount discountAmount = new Amount(10.0);
-
-        Amount totalAfterDiscount = sale.applyDiscount(customer, discountAmount);
-        Amount expected = new Amount(125.0 - 10.0);
-
-        assertEquals("Discount not applied correctly", expected, totalAfterDiscount);
-        assertTrue("Sale should indicate a discount was applied", sale.hasDiscount());
-    }
-
-    /**
      * Tests making a payment and calculating change.
      */
     @Test
-    public void testPayWithCashPayment() {
+    public void testCreateReceipt() {
         sale.addItem(testItem1, 1); // 50.0 + 12.5 VAT = 62.5
         Amount paymentAmount = new Amount(100.0);
-        CashPayment payment = new CashPayment(paymentAmount);
+        Amount changeAmount = new Amount(37.5);
 
-        Amount change = sale.pay(payment);
-        Amount expectedChange = new Amount(37.5); // 100.0 - 62.5
+        Receipt receipt = sale.createReceipt(paymentAmount, changeAmount);
 
-        assertEquals("Change calculated incorrectly", expectedChange, change);
+        assertNotNull("Receipt should not be null", receipt);
+        assertEquals("Receipt should have correct payment amount", paymentAmount, receipt.getPaymentAmount());
+        assertEquals("Receipt should have correct change amount", changeAmount, receipt.getChangeAmount());
     }
 
     /**
-     * Tests updating inventory via the ItemRegistry.
+     * Tests empty sale has zero totals.
      */
     @Test
-    public void testUpdateInventory() {
-        // Create a test mock of ItemRegistry
-        class MockItemRegistry extends ItemRegistry {
-            private boolean inventoryUpdated = false;
-            private List<SaleLineItem> lastItems = null;
+    public void testEmptySale() {
+        // No items added
 
-            @Override
-            public boolean updateInventoryForCompletedSale(List<SaleLineItem> saleItems) {
-                inventoryUpdated = true;
-                lastItems = saleItems;
-                return true;
-            }
-
-            public boolean wasInventoryUpdated() {
-                return inventoryUpdated;
-            }
-
-            public List<SaleLineItem> getLastItems() {
-                return lastItems;
-            }
-        }
-
-        // Setup test
-        sale.addItem(testItem1, 2);
-        MockItemRegistry mockRegistry = new MockItemRegistry();
-
-        // Execute test
-        boolean result = sale.updateInventory(mockRegistry);
-
-        // Verify results
-        assertTrue("Inventory update should succeed", result);
-        assertTrue("Inventory should be updated", mockRegistry.wasInventoryUpdated());
-        assertNotNull("Sale items should be passed to registry", mockRegistry.getLastItems());
-        assertEquals("Correct number of items should be passed", 1, mockRegistry.getLastItems().size());
-        assertEquals("Correct item should be passed", testItem1.getItemID(),
-                    mockRegistry.getLastItems().get(0).getItem().getItemID());
+        assertEquals("Total for empty sale should be zero",
+                    new Amount(0), sale.calculateTotal());
+        assertEquals("VAT for empty sale should be zero",
+                    new Amount(0), sale.calculateTotalVat());
+        assertEquals("Total with VAT for empty sale should be zero",
+                    new Amount(0), sale.calculateTotalWithVat());
     }
 
     /**
-     * Tests printing a receipt via the Printer.
+     * Tests that getItems returns a copy of the list, not the original.
      */
     @Test
-    public void testPrintReceipt() {
-        // Create a test mock of Printer
-        class MockPrinter extends Printer {
-            private boolean receiptPrinted = false;
-            private Receipt lastReceipt = null;
-
-            @Override
-            public void printReceipt(Receipt receipt) {
-                receiptPrinted = true;
-                lastReceipt = receipt;
-            }
-
-            public boolean wasReceiptPrinted() {
-                return receiptPrinted;
-            }
-
-            public Receipt getLastReceipt() {
-                return lastReceipt;
-            }
-        }
-
-        // Setup test
+    public void testGetItemsReturnsCopy() {
         sale.addItem(testItem1, 1);
-        CashPayment payment = new CashPayment(new Amount(100.0));
-        sale.pay(payment);
-        MockPrinter mockPrinter = new MockPrinter();
+        List<SaleLineItem> items = sale.getItems();
+        int originalSize = items.size();
 
-        // Execute test
-        sale.printReceipt(mockPrinter);
-
-        // Verify results
-        assertTrue("Receipt should have been printed", mockPrinter.wasReceiptPrinted());
-        assertNotNull("Printer should receive a receipt", mockPrinter.getLastReceipt());
-    }
-
-    /**
-     * Tests that receipt printing doesn't happen if no payment has been made.
-     */
-    @Test
-    public void testPrintReceiptWithoutPayment() {
-        // Create a test mock of Printer
-        class MockPrinter extends Printer {
-            private boolean receiptPrinted = false;
-
-            @Override
-            public void printReceipt(Receipt receipt) {
-                receiptPrinted = true;
-            }
-
-            public boolean wasReceiptPrinted() {
-                return receiptPrinted;
-            }
+        // Attempt to modify the returned list
+        try {
+            items.clear();
+        } catch (UnsupportedOperationException e) {
+            // This is good - the list should be unmodifiable
         }
 
-        // Setup test
-        sale.addItem(testItem1, 1);
-        MockPrinter mockPrinter = new MockPrinter();
-
-        // Execute test
-        sale.printReceipt(mockPrinter);
-
-        // Verify results
-        assertFalse("Receipt should not be printed before payment", mockPrinter.wasReceiptPrinted());
+        // Get the items again and verify the original is intact
+        List<SaleLineItem> itemsAgain = sale.getItems();
+        assertEquals("Original items list should not be affected by modification attempt",
+                    originalSize, itemsAgain.size());
     }
 }

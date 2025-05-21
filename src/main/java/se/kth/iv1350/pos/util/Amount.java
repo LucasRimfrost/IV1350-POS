@@ -10,18 +10,18 @@ public final class Amount {
     private final BigDecimal value;
 
     /**
-     * Creates a new instance representing the specified amount.
+     * Creates a new instance with the specified amount.
      *
-     * @param value The amount represented by the newly created instance.
+     * @param value The amount to represent
      */
     public Amount(BigDecimal value) {
         this.value = value.setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
-     * Creates a new instance representing the specified amount.
+     * Creates a new instance with the specified amount.
      *
-     * @param value The amount represented by the newly created instance.
+     * @param value The amount to represent
      */
     public Amount(double value) {
         this(BigDecimal.valueOf(value));
@@ -35,30 +35,30 @@ public final class Amount {
     }
 
     /**
-     * Adds the specified amount to this amount.
+     * Adds another amount to this amount.
      *
-     * @param other The amount to add.
-     * @return The sum of this and the specified amount.
+     * @param other The amount to add
+     * @return The sum
      */
     public Amount add(Amount other) {
         return new Amount(this.value.add(other.value));
     }
 
     /**
-     * Subtracts the specified amount from this amount.
+     * Subtracts another amount from this amount.
      *
-     * @param other The amount to subtract.
-     * @return The difference between this and the specified amount.
+     * @param other The amount to subtract
+     * @return The difference
      */
     public Amount subtract(Amount other) {
         return new Amount(this.value.subtract(other.value));
     }
 
     /**
-     * Multiplies this amount with the specified factor.
+     * Multiplies this amount by a factor.
      *
-     * @param factor The factor to multiply with.
-     * @return The product of this amount and the specified factor.
+     * @param factor The factor to multiply by
+     * @return The product
      */
     public Amount multiply(double factor) {
         return new Amount(this.value.multiply(BigDecimal.valueOf(factor)));
@@ -67,16 +67,16 @@ public final class Amount {
     /**
      * Gets the value of this amount.
      *
-     * @return The value of this amount.
+     * @return The value
      */
     public BigDecimal getValue() {
         return value;
     }
 
     /**
-     * Checks if this amount is greater than zero.
+     * Checks if this amount is positive.
      *
-     * @return true if this amount is greater than zero, false otherwise.
+     * @return True if positive, false otherwise
      */
     public boolean isPositive() {
         return value.compareTo(BigDecimal.ZERO) > 0;
