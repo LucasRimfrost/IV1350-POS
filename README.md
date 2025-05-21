@@ -29,18 +29,28 @@ The application follows a layered architecture with Model-View-Controller (MVC) 
 ### Commands
 To compile the project:
 ```bash
-make compile
+mvn compile
 ```
 To run unit tests:
 ```bash
-make test
+mvn test
 ```
 To run the application:
 ```bash
-make run
+java -cp target/classes se.kth.iv1350.pos.startup.Main
 ```
 
 To clean compiled files:
 ```bash
-make clean
+mvn clean
 ```
+
+## Getting Started
+
+### Cloning the Project for Seminar 4
+To clone this project and access the seminar 4 implementation:
+
+```bash
+# Clone the repository with the seminar4 branch directly
+git clone -b seminar3-improvements https://github.com/LucasRimfrost/IV1350-POS.git
+cd IV1350-POS
