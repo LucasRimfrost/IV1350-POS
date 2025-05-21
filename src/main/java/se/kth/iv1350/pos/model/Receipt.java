@@ -26,7 +26,6 @@ public class Receipt {
      * @param changeAmount The change given to the customer
      */
     public Receipt(Sale sale, Amount paymentAmount, Amount changeAmount) {
-        // Extract data from sale through its public interface
         this.items = new ArrayList<>(sale.getItems());
         this.totalAmount = sale.calculateTotal();
         this.totalVat = sale.calculateTotalVat();

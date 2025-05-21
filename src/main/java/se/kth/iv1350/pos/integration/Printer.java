@@ -9,14 +9,19 @@ import se.kth.iv1350.pos.util.Amount;
  * Represents the printer, used for printing receipts.
  */
 public class Printer {
-    private final int AMOUNT_COLUMN = 40; // Column for right-aligned amounts
+    private final int AMOUNT_COLUMN = 40;
+
+    private static final Printer instance = new Printer();
 
     /**
-     * Creates a new instance.
+     * Gets the singleton instance of the Printer.
+     *
+     * @return The singleton instance.
      */
-    public Printer() {
-        // Would initialize printer hardware in a real implementation
+    public static Printer getInstance() {
+        return instance;
     }
+
 
     /**
      * Prints the specified receipt.
@@ -96,5 +101,8 @@ public class Printer {
 
     private String formatAmount(Amount amount) {
         return String.format("%.2f", amount.getValue().doubleValue()).replace('.', ':');
+    }
+
+    private Printer() {
     }
 }

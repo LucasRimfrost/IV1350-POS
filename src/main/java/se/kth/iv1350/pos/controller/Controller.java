@@ -1,4 +1,3 @@
-// Controller.java
 package se.kth.iv1350.pos.controller;
 
 import java.util.ArrayList;
@@ -8,7 +7,11 @@ import se.kth.iv1350.pos.dto.ItemRegistrationDTO;
 import se.kth.iv1350.pos.dto.PaymentDTO;
 import se.kth.iv1350.pos.dto.ReceiptDTO;
 import se.kth.iv1350.pos.dto.SaleDTO;
+import se.kth.iv1350.pos.exception.DatabaseConnectionException;
+import se.kth.iv1350.pos.exception.ItemNotFoundException;
+import se.kth.iv1350.pos.exception.OperationFailedException;
 import se.kth.iv1350.pos.integration.AccountingSystem;
+import se.kth.iv1350.pos.integration.DiscountRegistry;
 import se.kth.iv1350.pos.integration.InventorySystem;
 import se.kth.iv1350.pos.integration.ItemRegistry;
 import se.kth.iv1350.pos.integration.Printer;
@@ -17,141 +20,200 @@ import se.kth.iv1350.pos.model.CashPayment;
 import se.kth.iv1350.pos.model.CashRegister;
 import se.kth.iv1350.pos.model.Receipt;
 import se.kth.iv1350.pos.model.Sale;
+import se.kth.iv1350.pos.model.SaleObserver;
 import se.kth.iv1350.pos.model.SaleProcessor;
 import se.kth.iv1350.pos.util.Amount;
+import se.kth.iv1350.pos.util.ErrorLogger;
 
 /**
- * Controller that coordinates operations between the view, model and integration layers.
- * Focus on orchestration with minimal business logic.
+ * The {@code Controller} class is the main coordinator between the
+ * view, model, and integration layers of the POS system.
+ * It orchestrates the overall sale process and interacts with
+ * external systems, such as inventory and accounting.
  */
-public class Controller {
+public class Controller implements AutoCloseable {
     private final ItemRegistry itemRegistry;
     private final Printer printer;
     private final AccountingSystem accountingSystem;
+    private final DiscountRegistry discountRegistry;
     private final InventorySystem inventorySystem;
+    private final ErrorLogger errorLogger;
 
     private final CashRegister cashRegister;
     private final SaleProcessor saleProcessor;
+    private final List<SaleObserver> saleObservers = new ArrayList<>();
+    private final List<AutoCloseable> resourcesToClose = new ArrayList<>();
 
     private Sale currentSale;
 
     /**
-     * Creates a new controller instance with references to external systems.
+     * Constructs a new instance of the controller and initializes it with
+     * all necessary external system references.
      *
-     * @param creator Used to get all external system handlers
+     * @param creator The registry creator providing access to external system handlers.
      */
     public Controller(RegistryCreator creator) {
         this.itemRegistry = creator.getItemRegistry();
         this.printer = creator.getPrinter();
         this.accountingSystem = creator.getAccountingSystem();
+        this.discountRegistry = creator.getDiscountRegistry();
         this.inventorySystem = creator.getInventorySystem();
+        this.errorLogger = new ErrorLogger();
+
+        resourcesToClose.add(errorLogger);
 
         this.cashRegister = new CashRegister();
         this.saleProcessor = new SaleProcessor();
     }
 
     /**
-     * Starts a new sale transaction.
+     * Registers an observer that will be notified when a sale is completed.
+     *
+     * @param observer The observer to be registered.
+     */
+    public void addSaleObserver(SaleObserver observer) {
+        saleObservers.add(observer);
+        if (observer instanceof AutoCloseable) {
+            resourcesToClose.add((AutoCloseable) observer);
+        }
+    }
+
+    /**
+     * Initiates a new sale. Must be called before registering any items.
      */
     public void startNewSale() {
         currentSale = new Sale();
     }
 
     /**
-     * Checks if a sale is currently active.
+     * Checks whether a sale is currently in progress.
      *
-     * @return true if a sale is active, false otherwise
+     * @return {@code true} if a sale is active; {@code false} otherwise.
      */
     public boolean isSaleActive() {
         return currentSale != null;
     }
 
     /**
-     * Adds an item to the current sale.
+     * Registers an item in the current sale using its item ID and quantity.
+     * Returns information about the registered item and updated totals.
      *
-     * @param itemID The identifier of the item to add
-     * @param quantity The quantity of the specified item
-     * @return Information about the entered item and running total, or null if item not found
+     * @param itemID   The identifier of the item to register.
+     * @param quantity The number of units to register.
+     * @return Information about the registered item and sale totals.
+     * @throws OperationFailedException If the item is not found or a system error occurs.
      */
-    public ItemRegistrationDTO enterItem(String itemID, int quantity) {
+    public ItemRegistrationDTO enterItem(String itemID, int quantity) throws OperationFailedException {
         if (!isSaleActive()) {
-            return null;
+            throw new OperationFailedException("No active sale. Start a new sale before adding items.");
         }
 
-        // Get item information from registry
-        ItemDTO item = itemRegistry.findItem(itemID);
-        if (item == null) {
-            return null;
+        try {
+            ItemDTO item = itemRegistry.findItem(itemID);
+            boolean isDuplicate = false;
+            for (var lineItem : currentSale.getItems()) {
+                if (lineItem.getItem().itemID().equals(itemID)) {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+            currentSale.addItem(item, quantity);
+            return new ItemRegistrationDTO(
+                item,
+                currentSale.calculateTotalWithVat(),
+                currentSale.calculateTotalVat(),
+                isDuplicate
+            );
+
+        } catch (ItemNotFoundException e) {
+            throw new OperationFailedException("Could not find the specified item: " + itemID, e);
+        } catch (DatabaseConnectionException e) {
+            errorLogger.logException(e);
+            throw new OperationFailedException("Could not perform the operation due to a system error", e);
+        }
+    }
+
+    /**
+     * Finalizes the current sale and returns its summarized data.
+     *
+     * @return A {@code SaleDTO} containing the finalized sale information.
+     * @throws OperationFailedException If there is no active sale.
+     */
+    public SaleDTO endSale() throws OperationFailedException {
+        if (!isSaleActive()) {
+            throw new OperationFailedException("No active sale to end.");
+        }
+        return saleProcessor.createSaleDTO(currentSale);
+    }
+
+    /**
+     * Processes a cash payment for the current sale, prints a receipt,
+     * updates inventory and accounting, and notifies observers.
+     *
+     * @param paidAmount The amount paid by the customer.
+     * @return A {@code PaymentDTO} containing payment and change information.
+     * @throws OperationFailedException If payment processing or system interaction fails.
+     */
+    public PaymentDTO processPayment(Amount paidAmount) throws OperationFailedException {
+        if (!isSaleActive()) {
+            throw new OperationFailedException("No active sale to process payment for.");
         }
 
-        // Check if this is a duplicate item
-        boolean isDuplicate = false;
-        for (var lineItem : currentSale.getItems()) {
-            if (lineItem.getItem().itemID().equals(itemID)) {
-                isDuplicate = true;
-                break;
+        try {
+            CashPayment payment = new CashPayment(paidAmount);
+            Amount totalToPay = currentSale.calculateTotalWithVat();
+            Amount change = payment.getChange(totalToPay);
+
+            Receipt receipt = currentSale.createReceipt(paidAmount, change);
+            ReceiptDTO receiptDTO = saleProcessor.createReceiptDTO(receipt);
+
+            cashRegister.addPayment(payment);
+            printer.printReceipt(receiptDTO);
+            accountingSystem.recordSale(saleProcessor.createSaleDTO(currentSale));
+            inventorySystem.updateInventory(currentSale.getItems());
+
+            notifyObservers(totalToPay);
+
+            return new PaymentDTO(paidAmount, change);
+
+        } catch (Exception e) {
+            errorLogger.logException(e);
+            throw new OperationFailedException("Payment processing failed", e);
+        }
+    }
+
+    /**
+     * Returns a summary of the current sale in progress.
+     *
+     * @return A {@code SaleDTO} representing the current sale's state.
+     * @throws OperationFailedException If there is no active sale.
+     */
+    public SaleDTO getCurrentSaleInfo() throws OperationFailedException {
+        if (!isSaleActive()) {
+            throw new OperationFailedException("No active sale.");
+        }
+        return saleProcessor.createSaleDTO(currentSale);
+    }
+
+    /**
+     * Releases all resources used by the controller.
+     * This method is called automatically if the controller is used in a try-with-resources block.
+     */
+    @Override
+    public void close() {
+        for (AutoCloseable resource : resourcesToClose) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                System.err.println("Error closing resource: " + e.getMessage());
             }
         }
-
-        // Add item to sale
-        currentSale.addItem(item, quantity);
-
-        // Return information about the addition
-        return new ItemRegistrationDTO(
-            item,
-            currentSale.calculateTotalWithVat(),
-            currentSale.calculateTotalVat(),
-            isDuplicate
-        );
+        System.out.println("Controller resources closed.");
     }
 
-    /**
-     * Ends the current sale and returns sale information.
-     *
-     * @return Data about the current sale, or null if no sale is in progress
-     */
-    public SaleDTO endSale() {
-        if (!isSaleActive()) {
-            return null;
+    private void notifyObservers(Amount paidAmount) {
+        for (SaleObserver observer : saleObservers) {
+            observer.newSale(paidAmount);
         }
-        return saleProcessor.createSaleDTO(currentSale);
-    }
-
-    /**
-     * Processes payment for the current sale.
-     *
-     * @param paidAmount The amount paid by the customer
-     * @return Payment information including change, or null if no sale is in progress
-     */
-    public PaymentDTO processPayment(Amount paidAmount) {
-        if (!isSaleActive()) {
-            return null;
-        }
-
-        CashPayment payment = new CashPayment(paidAmount);
-        Amount totalToPay = currentSale.calculateTotalWithVat();
-        Amount change = payment.getChange(totalToPay);
-
-        Receipt receipt = currentSale.createReceipt(paidAmount, change);
-        ReceiptDTO receiptDTO = saleProcessor.createReceiptDTO(receipt);
-
-        cashRegister.addPayment(payment);
-        printer.printReceipt(receiptDTO);
-        accountingSystem.recordSale(saleProcessor.createSaleDTO(currentSale));
-        inventorySystem.updateInventory(currentSale.getItems());
-
-        return new PaymentDTO(paidAmount, change);
-    }
-
-    /**
-     * Gets information about the current sale.
-     *
-     * @return Data about the current sale, or null if no sale is in progress
-     */
-    public SaleDTO getCurrentSaleInfo() {
-        if (!isSaleActive()) {
-            return null;
-        }
-        return saleProcessor.createSaleDTO(currentSale);
     }
 }

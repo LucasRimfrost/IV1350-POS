@@ -10,13 +10,15 @@ import se.kth.iv1350.pos.model.SaleLineItem;
 public class InventorySystem {
     private final ItemRegistry itemRegistry;
 
+    private static final InventorySystem instance = new InventorySystem(ItemRegistry.getInstance());
+
     /**
-     * Creates a new instance with a reference to the item registry.
+     * Gets the singleton instance of the InventorySystem.
      *
-     * @param itemRegistry The item registry to use
+     * @return The singleton instance.
      */
-    public InventorySystem(ItemRegistry itemRegistry) {
-        this.itemRegistry = itemRegistry;
+    public static InventorySystem getInstance() {
+        return instance;
     }
 
     /**
@@ -48,8 +50,6 @@ public class InventorySystem {
     }
 
     private boolean decreaseInventoryQuantity(String itemID, int quantity) {
-        // In a real implementation, this would update a database
-        // For this implementation, we delegate to the item registry
         boolean success = itemRegistry.decreaseInventoryQuantity(itemID, quantity);
 
         if (success) {
@@ -65,5 +65,9 @@ public class InventorySystem {
         } else {
             System.out.println("Some inventory updates failed. Manual verification required.");
         }
+    }
+
+    private InventorySystem(ItemRegistry itemRegistry) {
+        this.itemRegistry = itemRegistry;
     }
 }

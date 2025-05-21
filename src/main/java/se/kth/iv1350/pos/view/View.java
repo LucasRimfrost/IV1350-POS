@@ -5,6 +5,7 @@ import se.kth.iv1350.pos.dto.ItemDTO;
 import se.kth.iv1350.pos.dto.ItemRegistrationDTO;
 import se.kth.iv1350.pos.dto.PaymentDTO;
 import se.kth.iv1350.pos.dto.SaleDTO;
+import se.kth.iv1350.pos.exception.OperationFailedException;
 import se.kth.iv1350.pos.util.Amount;
 
 /**
@@ -50,14 +51,22 @@ public class View {
 
         printActionHeader("Add 1 item with item id 2:");
         scanItem("2", 1);
+
+        printActionHeader("Add 1 item with non-existent item id 999:");
+        scanItem("999", 1);
+
+        printActionHeader("Add 1 item with item id that triggers database error 9999:");
+        scanItem("9999", 1);
     }
 
     private void completeSale() {
         printActionHeader("End sale:");
-        SaleDTO saleDTO = controller.endSale();
 
-        if (saleDTO != null) {
+        try {
+            SaleDTO saleDTO = controller.endSale();
             System.out.println("Total cost (incl VAT): " + formatAmount(saleDTO.totalWithVat()) + " SEK");
+        } catch (OperationFailedException e) {
+            printErrorMessage(e);
         }
     }
 
@@ -65,18 +74,19 @@ public class View {
         Amount paymentAmount = new Amount(100);
         printActionHeader("Customer pays " + paymentAmount + ":");
 
-        PaymentDTO paymentResult = controller.processPayment(paymentAmount);
-
-        if (paymentResult != null) {
+        try {
+            PaymentDTO paymentResult = controller.processPayment(paymentAmount);
             System.out.println("\nChange to give the customer: " +
                 formatAmount(paymentResult.changeAmount()) + " SEK");
+        } catch (OperationFailedException e) {
+            printErrorMessage(e);
         }
     }
 
     private void scanItem(String itemID, int quantity) {
-        ItemRegistrationDTO result = controller.enterItem(itemID, quantity);
+        try {
+            ItemRegistrationDTO result = controller.enterItem(itemID, quantity);
 
-        if (result != null) {
             displayItemInfo(result.item());
 
             if (result.isDuplicate()) {
@@ -84,10 +94,20 @@ public class View {
             }
 
             displayRunningTotal(result.runningTotal(), result.runningVat());
-        } else {
-            System.out.println("Item with ID " + itemID + " not found in inventory!");
-            System.out.println();
+
+        } catch (OperationFailedException e) {
+            printErrorMessage(e);
         }
+    }
+
+    private void printErrorMessage(OperationFailedException e) {
+        System.out.println("ERROR: " + e.getMessage());
+
+        if (e.getCause() != null) {
+            System.out.println("Technical details: " + e.getCause().getMessage());
+        }
+
+        System.out.println();
     }
 
     private void displayItemInfo(ItemDTO item) {
@@ -114,6 +134,7 @@ public class View {
     }
 
     private void printDivider(String title) {
-        System.out.println(title);
+        System.out.println("\n" + title);
+        System.out.println("----------------------------------------");
     }
 }

@@ -2,22 +2,39 @@ package se.kth.iv1350.pos.startup;
 
 import se.kth.iv1350.pos.controller.Controller;
 import se.kth.iv1350.pos.integration.RegistryCreator;
+import se.kth.iv1350.pos.view.TotalRevenueFileOutput;
+import se.kth.iv1350.pos.view.TotalRevenueView;
 import se.kth.iv1350.pos.view.View;
 
 /**
- * Contains the main method. Performs all startup of the application.
+ * Entry point for the POS application. Responsible for initializing
+ * the controller, setting up observers, and starting the user interface.
  */
 public class Main {
     /**
-     * The main method used to start the application.
+     * Launches the application. Initializes core components and connects the
+     * controller to the view. Also sets up a shutdown hook to ensure all resources
+     * are properly released when the application terminates.
      *
-     * @param args The application does not take any command line parameters.
+     * @param args Command line arguments. These are not used in this application.
      */
     public static void main(String[] args) {
-        RegistryCreator creator = new RegistryCreator();
+        RegistryCreator creator = RegistryCreator.getInstance();
         Controller controller = new Controller(creator);
-        View view = new View(controller);
 
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            System.out.println("\nShutting down, closing resources...");
+            try {
+                controller.close();
+            } catch (Exception e) {
+                System.err.println("Error during shutdown: " + e.getMessage());
+            }
+        }));
+
+        controller.addSaleObserver(new TotalRevenueView());
+        controller.addSaleObserver(new TotalRevenueFileOutput());
+
+        View view = new View(controller);
         view.runFakeExecution();
     }
 }

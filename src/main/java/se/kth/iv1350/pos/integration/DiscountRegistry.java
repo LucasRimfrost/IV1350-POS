@@ -4,10 +4,17 @@ package se.kth.iv1350.pos.integration;
  * Stub implementation for the discount registry.
  */
 public class DiscountRegistry {
+    private static final DiscountRegistry instance = new DiscountRegistry();
+
     /**
-     * Creates a new instance.
+     * Gets the singleton instance of the DiscountRegistry.
+     *
+     * @return The singleton instance.
      */
-    public DiscountRegistry() {
-        // Stub implementation
+    public static DiscountRegistry getInstance() {
+        return instance;
+    }
+
+    private DiscountRegistry() {
     }
 }

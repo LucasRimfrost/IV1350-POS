@@ -7,11 +7,15 @@ import se.kth.iv1350.pos.util.Amount;
  * Contains all calls to the external accounting system.
  */
 public class AccountingSystem {
+    private static final AccountingSystem instance = new AccountingSystem();
+
     /**
-     * Creates a new instance.
+     * Gets the singleton instance of the AccountingSystem.
+     *
+     * @return The singleton instance.
      */
-    public AccountingSystem() {
-        // Would initialize connection to external system in a real implementation
+    public static AccountingSystem getInstance() {
+        return instance;
     }
 
     /**
@@ -20,7 +24,6 @@ public class AccountingSystem {
      * @param saleDTO The sale data to record
      */
     public void recordSale(SaleDTO saleDTO) {
-        // In a real implementation, this would send data to an external system
         System.out.println("Sale recorded in accounting system:");
         System.out.println("  Total amount: " + saleDTO.total());
         System.out.println("  Total VAT: " + saleDTO.totalVat());
@@ -32,7 +35,9 @@ public class AccountingSystem {
      * @param saleAmount The total amount from the sale
      */
     public void updateSalesStatistics(Amount saleAmount) {
-        // In a real implementation, this would update an external system
         System.out.println("Sales statistics updated. Amount: " + saleAmount);
+    }
+
+    private AccountingSystem() {
     }
 }
