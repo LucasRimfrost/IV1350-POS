@@ -4,7 +4,6 @@ import se.kth.iv1350.pos.util.Amount;
 
 /**
  * Represents a cash payment in a sale.
- * This class implements the Payment interface.
  */
 public class CashPayment {
     private final Amount paidAmount;
@@ -12,7 +11,7 @@ public class CashPayment {
     /**
      * Creates a new instance.
      *
-     * @param paidAmount The amount paid.
+     * @param paidAmount The amount paid
      */
     public CashPayment(Amount paidAmount) {
         this.paidAmount = paidAmount;
@@ -21,7 +20,7 @@ public class CashPayment {
     /**
      * Gets the paid amount.
      *
-     * @return The paid amount.
+     * @return The paid amount
      */
     public Amount getAmount() {
         return paidAmount;
@@ -30,8 +29,8 @@ public class CashPayment {
     /**
      * Calculates the change to return to the customer.
      *
-     * @param totalAmount The total amount of the sale.
-     * @return The amount of change to return.
+     * @param totalAmount The total amount of the sale
+     * @return The amount of change to return
      */
     public Amount getChange(Amount totalAmount) {
         return paidAmount.subtract(totalAmount);

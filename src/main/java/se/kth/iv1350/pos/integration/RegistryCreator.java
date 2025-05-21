@@ -1,7 +1,7 @@
 package se.kth.iv1350.pos.integration;
 
 /**
- * This class creates all registry classes, providing a single access point
+ * Creates all registry classes, providing a single access point
  * to all external systems.
  */
 public class RegistryCreator {
@@ -9,21 +9,23 @@ public class RegistryCreator {
     private final DiscountRegistry discountRegistry;
     private final AccountingSystem accountingSystem;
     private final Printer printer;
+    private final InventorySystem inventorySystem;
 
     /**
-     * Creates a new instance and initializes all needed registry classes and external system interfaces.
+     * Creates a new instance and initializes all system interfaces.
      */
     public RegistryCreator() {
         itemRegistry = new ItemRegistry();
         discountRegistry = new DiscountRegistry();
         accountingSystem = new AccountingSystem();
         printer = new Printer();
+        inventorySystem = new InventorySystem(itemRegistry);
     }
 
     /**
      * Gets the item registry.
      *
-     * @return The item registry.
+     * @return The item registry
      */
     public ItemRegistry getItemRegistry() {
         return itemRegistry;
@@ -32,27 +34,36 @@ public class RegistryCreator {
     /**
      * Gets the discount registry.
      *
-     * @return The discount registry.
+     * @return The discount registry
      */
     public DiscountRegistry getDiscountRegistry() {
         return discountRegistry;
     }
 
     /**
-     * Gets the accounting system interface.
+     * Gets the accounting system.
      *
-     * @return The accounting system interface.
+     * @return The accounting system
      */
     public AccountingSystem getAccountingSystem() {
         return accountingSystem;
     }
 
     /**
-     * Gets the printer interface.
+     * Gets the printer.
      *
-     * @return The printer interface.
+     * @return The printer
      */
     public Printer getPrinter() {
         return printer;
+    }
+
+    /**
+     * Gets the inventory system.
+     *
+     * @return The inventory system
+     */
+    public InventorySystem getInventorySystem() {
+        return inventorySystem;
     }
 }

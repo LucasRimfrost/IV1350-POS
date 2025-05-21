@@ -18,7 +18,7 @@ public class CashRegister {
     /**
      * Creates a new instance with the specified initial balance.
      *
-     * @param initialBalance The initial balance.
+     * @param initialBalance The initial balance
      */
     public CashRegister(Amount initialBalance) {
         this.balance = initialBalance;
@@ -27,7 +27,7 @@ public class CashRegister {
     /**
      * Records a payment. The paid amount is added to the balance.
      *
-     * @param payment The payment to record.
+     * @param payment The payment to record
      */
     public void addPayment(CashPayment payment) {
         balance = balance.add(payment.getAmount());
@@ -36,7 +36,7 @@ public class CashRegister {
     /**
      * Gets the current balance.
      *
-     * @return The current balance.
+     * @return The current balance
      */
     public Amount getBalance() {
         return balance;

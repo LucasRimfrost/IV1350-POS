@@ -4,18 +4,17 @@ import se.kth.iv1350.pos.dto.ItemDTO;
 import se.kth.iv1350.pos.util.Amount;
 
 /**
- * Represents a line item in a sale, containing information about
- * a specific item and its quantity.
+ * Represents a line item in a sale.
  */
 public class SaleLineItem {
     private final ItemDTO item;
     private int quantity;
 
     /**
-     * Creates a new instance.
+     * Creates a new line item.
      *
-     * @param item The item this line item represents.
-     * @param quantity The quantity of the specified item.
+     * @param item The item this line represents
+     * @param quantity The quantity of the item
      */
     public SaleLineItem(ItemDTO item, int quantity) {
         this.item = item;
@@ -23,56 +22,64 @@ public class SaleLineItem {
     }
 
     /**
-     * Increases the quantity by the specified amount.
+     * Increases the quantity of this line item.
      *
-     * @param quantityToAdd The quantity to add.
+     * @param quantityToAdd The quantity to add
      */
     public void incrementQuantity(int quantityToAdd) {
         this.quantity += quantityToAdd;
     }
 
     /**
-     * Gets the total price of this line item, excluding VAT.
+     * Gets the subtotal price excluding VAT.
      *
-     * @return The total price.
+     * @return The subtotal excluding VAT
      */
     public Amount getSubtotal() {
-        return item.getPrice().multiply(quantity);
+        return item.price().multiply(quantity);
     }
 
     /**
-     * Gets the total VAT amount for this line item.
+     * Gets the VAT amount for this line item.
      *
-     * @return The total VAT amount.
+     * @return The VAT amount
      */
     public Amount getVatAmount() {
-        return item.getVatAmount().multiply(quantity);
+        return calculateVatAmount().multiply(quantity);
     }
 
     /**
-     * Gets the total price including VAT for this line item.
+     * Gets the total price including VAT.
      *
-     * @return The total price including VAT.
+     * @return The total with VAT
      */
     public Amount getTotalWithVat() {
-        return item.getPriceWithVat().multiply(quantity);
+        return getPriceWithVat().multiply(quantity);
     }
 
     /**
-     * Gets the item DTO for this line item.
+     * Gets the item.
      *
-     * @return The item DTO.
+     * @return The item
      */
     public ItemDTO getItem() {
         return item;
     }
 
     /**
-     * Gets the quantity of this line item.
+     * Gets the quantity.
      *
-     * @return The quantity.
+     * @return The quantity
      */
     public int getQuantity() {
         return quantity;
+    }
+
+    private Amount calculateVatAmount() {
+        return item.price().multiply(item.vatRate());
+    }
+
+    private Amount getPriceWithVat() {
+        return item.price().add(calculateVatAmount());
     }
 }
