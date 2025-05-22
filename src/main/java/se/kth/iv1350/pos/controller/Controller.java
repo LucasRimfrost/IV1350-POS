@@ -16,10 +16,15 @@ import se.kth.iv1350.pos.integration.InventorySystem;
 import se.kth.iv1350.pos.integration.ItemRegistry;
 import se.kth.iv1350.pos.integration.Printer;
 import se.kth.iv1350.pos.integration.RegistryCreator;
+import se.kth.iv1350.pos.integration.SaleCompletionHandler;
+import se.kth.iv1350.pos.integration.SaleCompletionHandlerFactory;
+import se.kth.iv1350.pos.model.AddItemCommand;
 import se.kth.iv1350.pos.model.CashPayment;
 import se.kth.iv1350.pos.model.CashRegister;
+import se.kth.iv1350.pos.model.ProcessPaymentCommand;
 import se.kth.iv1350.pos.model.Receipt;
 import se.kth.iv1350.pos.model.Sale;
+import se.kth.iv1350.pos.model.SaleCommand;
 import se.kth.iv1350.pos.model.SaleObserver;
 import se.kth.iv1350.pos.model.SaleProcessor;
 import se.kth.iv1350.pos.util.Amount;
@@ -44,6 +49,8 @@ public class Controller implements AutoCloseable {
     private final List<SaleObserver> saleObservers = new ArrayList<>();
     private final List<AutoCloseable> resourcesToClose = new ArrayList<>();
 
+    private final List<SaleCompletionHandler> saleCompletionHandlers;
+
     private Sale currentSale;
 
     /**
@@ -64,6 +71,11 @@ public class Controller implements AutoCloseable {
 
         this.cashRegister = new CashRegister();
         this.saleProcessor = new SaleProcessor();
+
+        this.saleCompletionHandlers = SaleCompletionHandlerFactory.createAllHandlers(
+            accountingSystem,
+            inventorySystem
+        );
     }
 
     /**
@@ -117,7 +129,10 @@ public class Controller implements AutoCloseable {
                     break;
                 }
             }
-            currentSale.addItem(item, quantity);
+
+            SaleCommand addItemCommand = new AddItemCommand(currentSale, item, quantity);
+            addItemCommand.execute();
+
             return new ItemRegistrationDTO(
                 item,
                 currentSale.calculateTotalWithVat(),
@@ -148,7 +163,10 @@ public class Controller implements AutoCloseable {
 
     /**
      * Processes a cash payment for the current sale, prints a receipt,
-     * updates inventory and accounting, and notifies observers.
+     * and uses the Handler + Factory pattern to update external systems.
+     *
+     * The Factory pattern creates appropriate handlers, and the Handler pattern
+     * processes the completed sale with each external system.
      *
      * @param paidAmount The amount paid by the customer.
      * @return A {@code PaymentDTO} containing payment and change information.
@@ -164,15 +182,27 @@ public class Controller implements AutoCloseable {
             Amount totalToPay = currentSale.calculateTotalWithVat();
             Amount change = payment.getChange(totalToPay);
 
+            // Command Pattern: Process payment command
+            ProcessPaymentCommand paymentCommand = new ProcessPaymentCommand(paidAmount, cashRegister);
+            paymentCommand.execute();
+            System.out.println("Executed: " + paymentCommand.getDescription());
+
             Receipt receipt = currentSale.createReceipt(paidAmount, change);
             ReceiptDTO receiptDTO = saleProcessor.createReceiptDTO(receipt);
-
-            cashRegister.addPayment(payment);
             printer.printReceipt(receiptDTO);
-            accountingSystem.recordSale(saleProcessor.createSaleDTO(currentSale));
-            inventorySystem.updateInventory(currentSale.getItems());
+
+            // Handler + Factory Pattern: Process completed sale with external systems
+            SaleDTO saleDTO = saleProcessor.createSaleDTO(currentSale);
+            System.out.println("Using Handler + Factory pattern to process external systems:");
+            for (SaleCompletionHandler handler : saleCompletionHandlers) {
+                System.out.println("Processing with: " + handler.getHandlerName());
+                handler.handle(saleDTO);
+            }
 
             notifyObservers(totalToPay);
+
+            // Clear current sale after completion
+            currentSale = null;
 
             return new PaymentDTO(paidAmount, change);
 
